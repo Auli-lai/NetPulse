@@ -1,0 +1,559 @@
+================================================================================
+                    NetPulse 完整启动与排错手册
+================================================================================
+
+这份文档解决一件事：**让你每次都能顺利把项目跑起来，出错了知道往哪查。**
+
+它记录的都是实际踩过的坑（包括 Claude 写错的提示导致的坑），不是凭空写的
+理想流程。所有命令都验证过。
+
+如果只想快速跑起来，看【三、日常启动】。出问题了看【五、报错速查】。
+
+
+================================================================================
+一、先搞清楚：哪些东西必须跑在 WSL 里
+================================================================================
+
+这是最容易搞错的一点，也是你踩坑最多的地方。
+
+    ┌──────────────────────┬──────────────┬─────────────────────────────┐
+    │ 组件                  │ 必须跑在哪    │ 为什么                       │
+    ├──────────────────────┼──────────────┼─────────────────────────────┤
+    │ C++ 服务端            │ WSL          │ 是 Linux 可执行文件，Windows │
+    │ (weaknet-dbus-server) │              │ 根本跑不了；且 eBPF 要 root  │
+    ├──────────────────────┼──────────────┼─────────────────────────────┤
+    │ web 服务 / Agent      │ WSL          │ 要和 C++ 服务挂在同一个      │
+    │                       │              │ D-Bus 总线上，而 **D-Bus 是  │
+    │                       │              │ Linux 专有的，Windows 上没有**│
+    ├──────────────────────┼──────────────┼─────────────────────────────┤
+    │ 浏览器                │ Windows 就行  │ WSL2 会转发 localhost，      │
+    │                       │              │ 访问 http://localhost:8000   │
+    └──────────────────────┴──────────────┴─────────────────────────────┘
+
+**一句话：除了浏览器，全都在 WSL 里跑。**
+
+Windows 上跑 web 服务会遇到的报错：
+    "你在 Windows 上跑这个服务，而 D-Bus 是 Linux 专有的"
+→ 这不是能"修"的问题，D-Bus 在 Windows 上不存在。
+
+
+================================================================================
+二、第一次配置（只做一次）
+================================================================================
+
+前提：装好 WSL2（PowerShell 里跑 `wsl --install`，然后重启）。
+
+---- 2.1 进 WSL --------------------------------------------------------------
+
+    # 在 PowerShell 里：
+    wsl
+
+    # 之后所有命令都在 WSL 里执行。提示符会变成：
+    # zzp@DESKTOP-UV7RBQL:~$          （以 $ 结尾 = Linux）
+
+---- 2.2 装编译依赖 + 编译 C++ ------------------------------------------------
+
+    sudo apt-get update
+    sudo apt-get install -y build-essential clang llvm pkg-config \
+      libdbus-1-dev libglog-dev libelf-dev zlib1g-dev libcap-dev \
+      linux-headers-$(uname -r) libbpf-dev
+
+    cd "/mnt/e/Vscode projects/AI-Network-Monitoring-System"
+    make
+
+    # 产物：
+    #   server/bin/weaknet-dbus-server   服务端主程序
+    #   server/build/flow_rate.bpf.o     eBPF 字节码
+    #   client/lib/libweaknet.so         C API 动态库
+
+    # 注意：文档里如果写 netpulse-server / libnetpulse.so，那是旧的错误名字。
+
+---- 2.3 装系统包 ------------------------------------------------------------
+
+    sudo apt install python3-dbus      # ← D-Bus 的 Python 绑定，pip 装不上！
+    sudo apt install dbus              # ← 提供 dbus-daemon / dbus-send
+
+    验证：
+    /usr/bin/python3 -c "import dbus; print('系统 Python 有 dbus')"
+
+---- 2.4 建 Python 虚拟环境 --------------------------------------------------
+
+    为什么用 venv：把项目依赖和系统 Python 隔离开，不污染系统环境。
+
+    **关键：放在 ~ 下，不要放在 /mnt/e 里**（那边是 Windows 挂载盘，IO 慢，
+    而且某些操作不支持，比如 setcap 需要的扩展属性）。
+
+    python3 -m venv --system-site-packages ~/netpulse-venv
+
+    注意 --system-site-packages 这个参数**不能省**：
+    它让 venv 能看见 apt 装的系统包（包括 dbus）。
+    不加的话，venv 里永远 import 不到 dbus —— 这正是"我明明装了却提示没装"的原因。
+
+---- 2.5 装 Python 依赖 ------------------------------------------------------
+
+    source ~/netpulse-venv/bin/activate      # 激活（提示符前会出现 (netpulse-venv)）
+
+    cd "/mnt/e/Vscode projects/AI-Network-Monitoring-System"
+    pip install -r rag/requirements.txt        -i https://mirrors.aliyun.com/pypi/simple/
+    pip install -r agent/requirements.txt      -i https://mirrors.aliyun.com/pypi/simple/
+    pip install -r web/requirements.txt        -i https://mirrors.aliyun.com/pypi/simple/
+    pip install -r mcp_server/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+
+    验证 dbus 在这个 venv 里也能看到：
+    python -c "import dbus; print('venv 里 dbus OK')"
+
+    （-i 是换阿里云的源，国内直连 PyPI 经常超时。和安全性无关。）
+
+---- 2.6 配 API Key ----------------------------------------------------------
+
+    cd "/mnt/e/Vscode projects/AI-Network-Monitoring-System"
+    cp .env.example .env
+    nano .env            # 把 QWEN_API_KEY=sk-在这里填你的key 改成真实 key
+                         # Ctrl+O 保存，Ctrl+X 退出
+
+    验证读到了没有：
+    cd rag && python config.py
+    # 输出里应该有：API_KEY  …xxxx  （已读到，长度 35）
+
+    ★ 一个必须说清楚的误解 ★
+
+        代码里写 os.environ.get("QWEN_API_KEY")
+        ≠ "key 配好了"
+
+    这一行的意思是【去环境变量里读】。它读不到就是读不到。
+    在源码里写这行代码，一个字符的 key 都不会产生。
+    key 必须在**启动进程之前**就已经存在于环境里。
+
+    .env 文件就是干这个的：写在项目根目录，所有入口自动读。
+
+---- 2.7 建检索索引 ----------------------------------------------------------
+
+    cd "/mnt/e/Vscode projects/AI-Network-Monitoring-System/rag"
+    python build_index.py --sample
+
+    # 看到"索引构建完成"就行。产物在 rag/index_store/
+    # 有了它，search_network_history 工具才能用。
+
+    验证知识库也进来了（知识库在 AI-assisted analysis_old/ 里）：
+    python knowledge.py
+    # 应该显示"知识库大类：7 个"
+
+
+================================================================================
+三、日常启动（每次都要做）
+================================================================================
+
+需要**两个终端**。启动顺序不能反 —— 客户端依赖服务端。
+
+---- 终端 A：启动 C++ 服务端 ------------------------------------------------
+
+    wsl                       # 如果还没在 WSL 里
+    cd "/mnt/e/Vscode projects/AI-Network-Monitoring-System"
+    ./run-dbus-server.sh
+
+    这个脚本会做三件事：
+      1. 找一个（或起一个）可用的 D-Bus 总线
+      2. **验证 root 能不能连上它** —— 连不上就停下来说清楚原因
+      3. 用显式地址启动服务端
+
+    成功的话会看到：
+        [1/3] 当前用户的 session bus 可用
+              unix:path=/run/user/1000/bus
+        [2/3] 验证 root 能否连上同一个总线
+              可以 —— root 能拿到回复
+        [3/3] 启动服务端
+              ...
+              export DBUS_SESSION_BUS_ADDRESS='unix:path=/run/user/1000/bus'
+
+    ★ 把最后那行 export 记下来，终端 B 要用。脚本每次都会打印。
+    ★ 这个终端**不要关**，服务端在里面前台运行。
+
+    如果 [2/3] 报错说 root 连不上，看【五、报错速查】的 A2。
+
+---- 终端 B：启动 web 服务 --------------------------------------------------
+
+    wsl                       # 新开一个终端，重新进 WSL
+    source ~/netpulse-venv/bin/activate        # ★ 每次都别忘了这步
+
+    cd "/mnt/e/Vscode projects/AI-Network-Monitoring-System/web"
+
+    # 把终端 A 打印的那个地址 export 进来（地址每次都可能不同，要重新复制）
+    export DBUS_SESSION_BUS_ADDRESS='unix:path=/run/user/1000/bus'
+
+    # 启动（--host 0.0.0.0 才能被 Windows 的浏览器访问）
+    python -m uvicorn app:app --host 0.0.0.0 --port 8000
+
+    看到 "Uvicorn running on http://0.0.0.0:8000" 就成功了。
+
+---- 浏览器 ----------------------------------------------------------------
+
+    在 **Windows** 里打开：  http://localhost:8000
+
+    WSL2 会自动转发 localhost，不用配任何东西。
+
+    第一次打开会做环境检查，正常的话右上角不出现黄色提示条。
+
+---- 不想开浏览器？用命令行 -------------------------------------------------
+
+    # 另开一个终端
+    wsl
+    source ~/netpulse-venv/bin/activate
+    cd "/mnt/e/Vscode projects/AI-Network-Monitoring-System/agent"
+    export DBUS_SESSION_BUS_ADDRESS='...'      # 同上，从终端 A 复制
+
+    python main.py                             # 交互模式（支持多轮）
+    python main.py -q "网络很卡，帮我看看"       # 单次提问
+    python main.py --dry-run                   # 离线演示（不需要任何配置）
+
+---- 全部关掉 --------------------------------------------------------------
+
+    终端 B：Ctrl+C   停 web 服务
+    终端 A：Ctrl+C   停 C++ 服务端
+
+    （D-Bus 总线不用管，它自己会留着，或者下次脚本会复用/重建。）
+
+
+================================================================================
+四、虚拟环境（venv）怎么用
+================================================================================
+
+---- 它是什么 --------------------------------------------------------------
+
+一个**独立的 Python 环境**。里面有自己的一份 Python 和 pip 包，
+和你系统 Python 分开。好处：
+
+  · 项目依赖不会污染系统 Python（`sudo apt` 装的包和它互不干扰）
+  · 不同项目可以用不同版本的同一个库
+  · 删掉 venv 就等于全部卸载干净，不留垃圾
+
+---- 它在哪里 --------------------------------------------------------------
+
+    ~/netpulse-venv
+
+    展开就是 /home/zzp/netpulse-venv/，对应 Windows 侧的
+    \\wsl$\Ubuntu\home\zzp\netpulse-venv\（在资源管理器地址栏能打开）
+
+    目录结构：
+      ~/netpulse-venv/bin/activate      激活脚本
+      ~/netpulse-venv/bin/python        这个环境里的解释器
+      ~/netpulse-venv/bin/pip           这个环境里的 pip
+      ~/netpulse-venv/lib/python3.x/site-packages/   装的包都在这
+
+---- 怎么用 ----------------------------------------------------------------
+
+    # 激活（每次开新终端都要做一次！）
+    source ~/netpulse-venv/bin/activate
+    # 激活后提示符会变成：
+    #   (netpulse-venv) zzp@DESKTOP-UV7RBQL:...$
+    #    ^^^^^^^^^^^^^^ 看到这个前缀就是激活了
+
+    # 确认激活的是哪个
+    echo $VIRTUAL_ENV        # 打印 /home/zzp/netpulse-venv 就是对的
+    which python             # 应该显示 ~/netpulse-venv/bin/python
+
+    # 退出
+    deactivate
+
+    # 看装了哪些包
+    pip list
+
+    # 装新包（必须先激活，否则装到系统 Python 里去了）
+    pip install 包名 -i https://mirrors.aliyun.com/pypi/simple/
+
+---- 三个关键规则 ----------------------------------------------------------
+
+    ★ 规则 1：每开一个新终端都要重新 source activate
+      环境变量不跨终端。你以为还激活着，其实新终端是干净的。
+
+    ★ 规则 2：pip install 之前先确认提示符有 (netpulse-venv)
+      没有的话，包会装到系统 Python 里 —— 然后你会困惑
+      "明明装了怎么还是 import 不到"。
+
+    ★ 规则 3：**项目目录里那个 .venv 是 Windows 的，在 WSL 里不能用**
+      它里面的 python 是 python.exe。在 WSL 里激活它或者用它跑脚本都会失败。
+      两个环境的 venv 不能混用。WSL 里认准 ~/netpulse-venv。
+
+---- 不想每次都 source？---------------------------------------------------
+
+在 ~/.bashrc 末尾加一行别名：
+
+    echo "alias npa='source ~/netpulse-venv/bin/activate'" >> ~/.bashrc
+    source ~/.bashrc
+
+之后敲 `npa` 就等于激活。
+
+（不建议直接写进 .bashrc 自动激活 —— 会影响所有终端，
+以后别的项目容易搞混。）
+
+
+================================================================================
+五、报错速查
+================================================================================
+
+按【你看到的报错】查。每条都是实际遇到的。
+
+--------------------------------------------------------------------------------
+A. C++ 服务端
+--------------------------------------------------------------------------------
+
+A1. "连接总线失败: Did not receive a reply. Possible causes include: ...
+     the message bus security policy blocked the reply, ..."
+
+    现象：服务端启动时 D-Bus 初始化失败，然后进程退出（return 1）。
+    原因：**root 连不上用户的 session bus**。dbus-daemon 对拒绝的连接就是
+          "不回复"，所以报的是超时，看起来像网络问题，其实是被拒了。
+    解法：用 ./run-dbus-server.sh —— 它会先验证这一点，连不上会告诉你怎么做。
+
+    手动确认（一条命令）：
+        sudo DBUS_SESSION_BUS_ADDRESS='unix:path=/run/user/1000/bus' \
+          dbus-send --print-reply --dest=org.freedesktop.DBus \
+          /org/freedesktop/DBus org.freedesktop.DBus.ListNames
+        报错 → 确认是被拒了
+
+    真正的解法：**别用 sudo，改用 setcap**
+        sudo setcap cap_bpf,cap_perfmon,cap_net_admin,cap_net_raw,cap_sys_admin+eip \
+             "/mnt/e/Vscode projects/AI-Network-Monitoring-System/server/bin/weaknet-dbus-server"
+        ./server/bin/weaknet-dbus-server          # 不带 sudo
+
+        验证设上了：getcap "/mnt/e/.../weaknet-dbus-server"
+
+A2. setcap 报 "Failed to set capabilities on file ' /mnt/e/...': No such file
+     or directory"
+
+    现象：注意错误信息里文件名**前面有一个空格**。
+    原因：你把带反斜杠续行的多行命令**粘成了一行**。
+          `\` 后面跟换行才是续行；`\` 后面跟空格是"转义空格"，
+          那个空格会变成文件名的一部分。
+    解法：一行写完，**不要反斜杠**，路径加引号：
+        sudo setcap cap_bpf,...,cap_sys_admin+eip "/mnt/e/Vscode projects/.../weaknet-dbus-server"
+
+    记忆点：从文档里复制带 `\` 的多行命令，粘成一行时**必须把 `\` 删掉**。
+
+A3. setcap 报 "Operation not supported"
+
+    原因：/mnt/e 是 Windows 挂载盘（drvfs），**不支持扩展属性**，
+          而 setcap 靠 xattr 存能力。
+    解法：把项目挪到 WSL 自己的文件系统：
+        cp -r "/mnt/e/Vscode projects/AI-Network-Monitoring-System" ~/netpulse
+        cd ~/netpulse
+        make clean && make
+        sudo setcap cap_bpf,cap_perfmon,cap_net_admin,cap_net_raw,cap_sys_admin+eip \
+             ./server/bin/weaknet-dbus-server
+        ./run-dbus-server.sh
+
+    （顺带：~/ 下构建和文件 IO 都比 /mnt/e 快很多。）
+
+A4. 服务端起了，但 Python 客户端还是连不上
+
+    检查两边的 DBUS_SESSION_BUS_ADDRESS 是不是**同一个**：
+        # 终端 A（服务端）
+        echo $DBUS_SESSION_BUS_ADDRESS
+        # 终端 B（客户端）
+        echo $DBUS_SESSION_BUS_ADDRESS
+
+    不一样 = 挂在两个不同的总线上，互相看不见。
+    从终端 A 复制地址，在终端 B 重新 export。
+
+--------------------------------------------------------------------------------
+B. Python / Web 服务
+--------------------------------------------------------------------------------
+
+B1. 页面提示"你在 Windows 上跑这个服务，而 D-Bus 是 Linux 专有的"
+
+    原因：你在 **PowerShell** 里跑的服务，不是 WSL。
+         D-Bus 是 Linux 的 IPC 机制，Windows 上没有，
+         dbus-python 在 Windows 上根本装不了（不是操作问题）。
+    解法：**在 WSL 里跑**（见【三、日常启动】）。
+         只想看界面的话，点页面上的"演示模式" —— 不需要 D-Bus。
+
+B2. 页面提示"没装 dbus-python"但你明明装了
+
+    原因（两种，都要排）：
+      ① 装给了**另一个 Python**。`sudo apt install python3-dbus` 装的是
+         系统 Python（/usr/bin/python3）的包。venv 默认看不到它。
+      ② 你在 Windows 上跑（见 B1）。
+
+    解法：
+      建 venv 时加 --system-site-packages：
+          rm -rf ~/netpulse-venv
+          python3 -m venv --system-site-packages ~/netpulse-venv
+          source ~/netpulse-venv/bin/activate
+          pip install -r web/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+      验证：python -c "import dbus; print('OK')"
+
+    自查：健康检查现在会报出**正在跑服务的 Python 路径**，和下面这条对比：
+          /usr/bin/python3 -c "import dbus; print('系统 Python 有 dbus')"
+      两个路径不一样，就是这个问题。
+
+B3. 提示"没读到 QWEN_API_KEY" / 模型调不动
+
+    先理解：os.environ.get("QWEN_API_KEY") 是【去读】，不是【配好了】。
+    代码里写了这一行，也不会凭空产生 key。
+
+    三个最常见的原因：
+      ① 在 A 终端 export，在 B 终端起服务 —— 环境变量不跨终端
+      ② 在 PowerShell 里 export，服务跑在 WSL 里 —— 两个独立环境
+      ③ export 之后**没重启服务** —— 环境变量是进程启动时读进去的
+
+    解法（推荐）：
+        cd "/mnt/e/Vscode projects/AI-Network-Monitoring-System"
+        cp .env.example .env && nano .env     # 填上 sk-...
+        然后重启服务
+
+    验证：
+        cd rag && python config.py            # 看 API_KEY 那行
+        网页的健康检查也会显示后 4 位
+
+B4. 提示"检索索引不存在" / search_network_history 失败
+
+        cd rag && python build_index.py --sample
+
+B5. 中文显示成问号或乱码
+
+    设置编码后再跑：
+        export PYTHONIOENCODING=utf-8
+    或者跑 `cd rag && python console.py` 自检一下。
+
+B6. 端口被占用："Address already in use"
+
+    # 找谁占着 8000
+    ss -lntp | grep 8000
+    # 或者直接换个端口
+    python -m uvicorn app:app --host 0.0.0.0 --port 8001
+
+B7. 改了代码但页面没变化
+
+    uvicorn 要加 --reload 才会自动重载：
+        python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+    或者手动 Ctrl+C 重启。
+
+--------------------------------------------------------------------------------
+C. 编译 / 构建
+--------------------------------------------------------------------------------
+
+C1. make 报找不到 dbus.h / glog/logging.h
+
+        sudo apt-get install -y libdbus-1-dev libglog-dev pkg-config
+
+C2. eBPF 编译报找不到 vmlinux.h 或 "cannot find bpf helpers"
+
+        sudo apt-get install -y libbpf-dev linux-headers-$(uname -r)
+    还不行的话看看 server/src/vmlinux.h 在不在（3.6MB 那个文件）。
+
+C3. 编译过了但流量数据是空的
+
+    WSL2 的内核对 eBPF 支持有限（kprobe 需要 tracefs，某些版本挂不上）。
+    这不影响其它功能 —— list_interfaces / get_conn_stats（ICMP +
+    /proc/net/snmp）照常能用，只有流量和连接明细那部分需要 eBPF。
+    真跑不了就换真 Linux 或云主机。
+
+--------------------------------------------------------------------------------
+D. venv 相关
+--------------------------------------------------------------------------------
+
+D1. "python: command not found" 或 "no module named uvicorn"
+
+    忘了激活 venv。：
+        source ~/netpulse-venv/bin/activate
+    确认提示符有 (netpulse-venv)。
+
+D2. 装了包但还是 import 不到
+
+    pip 装到了别的环境。检查：
+        which python    # 是不是 ~/netpulse-venv/bin/python
+        which pip
+        pip list | grep 包名
+    不对的话先 activate 再重装。
+
+D3. 项目里那个 .venv 用不了
+
+    那是 **Windows 的 venv**（里面的 python 是 python.exe），
+    在 WSL 里不能用。WSL 里认准 ~/netpulse-venv。
+
+
+================================================================================
+六、一张图看懂排查思路
+================================================================================
+
+这个项目里遇到的报错，很多都有个共同特点：
+**报错信息描述的是症状，根因在别处。** 具体例子：
+
+    你看到的                          实际原因
+    ─────────────────────────────    ──────────────────────────────
+    "Did not receive a reply"        总线策略拒绝了 root，不回你
+    （像是网络超时）
+    "C++ 服务没在跑"                  没装 dbus-python（或跑在 Windows 上）
+    "No such file or directory"       路径前面有一个看不见的空格
+    "没装 dbus-python"                装给了另一个 Python
+    "没配 QWEN_API_KEY"               在另一个终端/另一个系统里 export 的
+
+**排查方法：死磕报错原文里的细节，而不是凭直觉猜。**
+
+比如 A2 那条，答案就写在报错自己身上 —— 文件名前面那个空格。
+如果当时直接去检查"文件到底存不存在"，方向就完全错了。
+
+还有一条：**先确认"我在哪个环境里"**。
+这个项目横跨 Windows / WSL / venv / Docker 四种环境，
+大部分困惑其实来自"以为自己在 A，实际在 B"。
+
+    三个立刻能回答"我在哪"的命令：
+        pwd                          # 当前目录
+        echo $VIRTUAL_ENV            # 有没有激活 venv，哪个
+        uname -a                     # 输出带 Linux 字样 = 在 WSL 里
+
+
+================================================================================
+七、常用命令速查
+================================================================================
+
+    # ---- 环境 ----
+    wsl                                      进 WSL
+    source ~/netpulse-venv/bin/activate      激活 venv（每个新终端都要）
+    deactivate                               退出 venv
+    echo $VIRTUAL_ENV                        当前激活的是哪个 venv
+    cd rag && python config.py               看当前所有配置（含 key 读到没）
+
+    # ---- 启动 ----
+    ./run-dbus-server.sh                     终端 A：启动 C++ 服务
+    cd web && python -m uvicorn app:app --host 0.0.0.0 --port 8000
+                                             终端 B：启动 web 服务
+    cd agent && python main.py               终端 B 的替代：命令行 Agent
+
+    # ---- 不配置就能跑的 ----
+    cd agent && python main.py --dry-run     离线演示（假模型 + 假工具）
+    浏览器打开 http://localhost:8000 后点"演示模式"
+
+    # ---- 验证 ----
+    cd agent && python3 test_tools.py        逐个工具试，打印真实返回
+    dbus-send --session --print-reply --dest=com.example.WeakNet \
+        /com/example/WeakNet com.example.WeakNet.GetInterfaces
+                                             服务注册到总线上了吗
+    curl -s localhost:8000/api/health | python3 -m json.tool
+                                             各依赖状态 + 修法提示
+
+    # ---- 测试 ----
+    cd agent      && python test_agent.py            144 项，全离线
+    cd mcp_server && python test_server.py           69 项
+    cd web        && python test_api.py              63 项
+
+    # ---- 维护 ----
+    cd rag && python build_index.py --sample         重建检索索引
+    cd agent && python main.py --memories            看长期记忆
+    cd agent && python main.py --forget <id>         删某条记忆
+    cd agent && python measure.py --runs 20          测"平均调用几个工具"
+
+
+================================================================================
+八、还遇到新问题怎么办
+================================================================================
+
+1. 先看【五、报错速查】有没有对得上的
+2. 再确认"我在哪个环境"（pwd / echo $VIRTUAL_ENV / uname -a）
+3. 还不行就把**完整的报错原文**发出来 —— 不要只描述"它报错了"。
+   报错原文里的每个字都可能是线索，比如那个看不见的空格。
+
+最后一条是最重要的经验：
+**这个项目里大部分时间不是花在"写代码"上，而是花在"看懂报错"上。**
+这不是你的问题，是所有跨环境项目的常态。
+
+================================================================================
