@@ -1,0 +1,23 @@
+# WEAK_NET AI-Assisted Analysis Requirements
+# Python依赖包列表
+
+# 核心依赖
+dbus-python>=1.2.16
+PyGObject>=3.40.0
+
+# LangChain和AI相关依赖
+langchain>=0.0.350
+openai>=1.0.0
+faiss-cpu>=1.7.4
+tiktoken>=0.5.0
+
+# 可选依赖（用于高级功能）
+matplotlib>=3.5.0      # 数据可视化
+pandas>=1.3.0          # 数据分析
+numpy>=1.21.0          # 数值计算
+scipy>=1.7.0           # 科学计算
+
+# 开发和测试依赖
+pytest>=6.0.0          # 单元测试
+black>=21.0.0           # 代码格式化
+flake8>=3.9.0           # 代码检查

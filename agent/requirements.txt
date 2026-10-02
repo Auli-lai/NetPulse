@@ -1,0 +1,31 @@
+# Agent 层依赖
+#
+# 注意：本目录要用到 rag/ 的检索层（search_network_history 工具），
+# 所以 rag/requirements.txt 里的东西这里也要装。下面一并列出。
+#
+# 安装：
+#     pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+
+# ---- 生成 + Function Calling ----
+# Anthropic 协议的 SDK。注意：我们打的是百炼的 Anthropic 兼容端点，
+# 后面跑的是 Qwen，不是 Claude —— SDK 是 Anthropic 的，模型不是。
+anthropic>=0.40
+
+# ---- D-Bus（Linux 专有）----
+# 这一条 pip 装不上，要用系统包管理器：
+#     sudo apt install python3-dbus
+# 这里列出来只是为了说明它是个依赖，不是让你 pip install。
+# 没装它的话：实时指标类工具不可用，但 test_agent.py 和 --dry-run 照样能跑。
+# dbus-python
+
+# ---- search_network_history 工具要用（同 rag/）----
+openai>=1.40          # 向量化走 OpenAI 兼容端点
+faiss-cpu>=1.8        # 向量索引
+jieba>=0.42           # BM25 中文分词
+numpy>=1.24
+requests>=2.31        # rerank 走 DashScope 原生 HTTP
+
+# ---- 说明 ----
+# langchain / langchain-community **不需要**。
+# 本项目手写 ReAct 循环（agent.py），用框架反而看不清循环里发生了什么，
+# 而且面试时"我自己写的循环"比"我调了 LangChain"更有说服力。
