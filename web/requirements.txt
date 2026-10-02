@@ -1,0 +1,25 @@
+# Web 服务层依赖
+#
+# 安装：
+#     pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+
+# ---- Web 框架 ----
+fastapi>=0.115
+uvicorn[standard]>=0.30      # [standard] 带上 websockets/httptools，SSE 更稳
+pydantic>=2.7
+
+# ---- 被 agent/ 和 rag/ 间接依赖（容器里要一并装上）----
+# 详见 agent/requirements.txt 和 rag/requirements.txt 的说明
+anthropic>=0.40              # 生成（Anthropic Messages 协议）
+openai>=1.40                 # 向量化（百炼 OpenAI 兼容端点）
+faiss-cpu>=1.8               # 向量索引；需要系统库 libgomp1
+jieba>=0.42                  # BM25 中文分词
+numpy>=1.24
+requests>=2.31               # rerank 走 DashScope 原生 HTTP
+
+# ---- 注意 ----
+# dbus-python **不在**这里。它是 Linux 系统包（apt install python3-dbus），
+# 而且容器里要用它得把宿主机的 D-Bus socket 挂进来。见 docker-compose.yml。
+#
+# 没装它不影响服务启动 —— 依赖 D-Bus 的工具会返回错误，模型看得到并会绕开，
+# 知识库检索和长期记忆完全不受影响。这是有意的降级设计。

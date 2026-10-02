@@ -1,0 +1,366 @@
+{
+  "dim": 1024,
+  "chunks": [
+    {
+      "chunk_id": "kb_936d945140c9",
+      "text": "网络知识 · rtt_analysis · symptoms\n类别说明：RTT (Round Trip Time) 往返时延分析\nhigh_rtt: RTT过高会导致网络延迟增加，影响实时应用性能\nrtt_timeout: RTT超时(-1ms)表示网络连接失败或目标不可达\nrtt_fluctuation: RTT波动大表示网络不稳定",
+      "metadata": {
+        "source": "knowledge",
+        "category": "rtt_analysis",
+        "topic": "symptoms"
+      }
+    },
+    {
+      "chunk_id": "kb_804c1060d57a",
+      "text": "网络知识 · rtt_analysis · troubleshooting\n类别说明：RTT (Round Trip Time) 往返时延分析\nhigh_rtt: 检查网络拥塞、路由问题、DNS解析延迟\ntimeout: 检查网络连接、防火墙设置、目标服务器状态\nfluctuation: 检查网络质量、干扰源、负载均衡配置",
+      "metadata": {
+        "source": "knowledge",
+        "category": "rtt_analysis",
+        "topic": "troubleshooting"
+      }
+    },
+    {
+      "chunk_id": "kb_ddc3600197e4",
+      "text": "网络知识 · tcp_loss_analysis · symptoms\n类别说明：TCP丢包率分析\nhigh_loss: 丢包率高会导致数据传输重传，降低网络效率\nburst_loss: 突发丢包可能表示网络拥塞或设备故障\npersistent_loss: 持续丢包可能表示链路质量问题",
+      "metadata": {
+        "source": "knowledge",
+        "category": "tcp_loss_analysis",
+        "topic": "symptoms"
+      }
+    },
+    {
+      "chunk_id": "kb_7a6b5ec312b5",
+      "text": "网络知识 · tcp_loss_analysis · troubleshooting\n类别说明：TCP丢包率分析\nhigh_loss: 检查网络设备、链路质量、拥塞控制\nburst_loss: 检查网络设备状态、流量突发、QoS配置\npersistent_loss: 检查物理链路、设备端口、网络配置",
+      "metadata": {
+        "source": "knowledge",
+        "category": "tcp_loss_analysis",
+        "topic": "troubleshooting"
+      }
+    },
+    {
+      "chunk_id": "kb_0aab311c192e",
+      "text": "网络知识 · traffic_analysis · normal_indicators\n类别说明：网络流量分析\nbandwidth_utilization: 正常利用率应<80%\nflow_count: 活跃连接数应合理\npacket_rate: 包速率应稳定",
+      "metadata": {
+        "source": "knowledge",
+        "category": "traffic_analysis",
+        "topic": "normal_indicators"
+      }
+    },
+    {
+      "chunk_id": "kb_04136f3b617f",
+      "text": "网络知识 · traffic_analysis · symptoms\n类别说明：网络流量分析\nzero_traffic: 流量为0可能表示网络中断或监控问题\nhigh_utilization: 高利用率可能导致网络拥塞\nabnormal_flows: 异常连接数可能表示攻击或配置问题",
+      "metadata": {
+        "source": "knowledge",
+        "category": "traffic_analysis",
+        "topic": "symptoms"
+      }
+    },
+    {
+      "chunk_id": "kb_516e312d1ebe",
+      "text": "网络知识 · traffic_analysis · troubleshooting\n类别说明：网络流量分析\nzero_traffic: 检查网络连接、eBPF程序、监控配置\nhigh_utilization: 检查带宽限制、流量控制、网络规划\nabnormal_flows: 检查安全策略、连接限制、异常检测",
+      "metadata": {
+        "source": "knowledge",
+        "category": "traffic_analysis",
+        "topic": "troubleshooting"
+      }
+    },
+    {
+      "chunk_id": "kb_deae45fc7046",
+      "text": "网络知识 · rssi_analysis · signal_levels\n类别说明：WiFi信号强度分析\nexcellent: -30 to -50 dBm\ngood: -50 to -60 dBm\nfair: -60 to -70 dBm\npoor: -70 to -80 dBm\ncritical: < -80 dBm",
+      "metadata": {
+        "source": "knowledge",
+        "category": "rssi_analysis",
+        "topic": "signal_levels"
+      }
+    },
+    {
+      "chunk_id": "kb_f19a876514c4",
+      "text": "网络知识 · rssi_analysis · symptoms\n类别说明：WiFi信号强度分析\nlow_rssi: 信号弱会导致连接不稳定、速度慢\nrssi_fluctuation: 信号波动表示环境干扰或设备问题\nno_signal: 无信号表示WiFi未连接或设备故障",
+      "metadata": {
+        "source": "knowledge",
+        "category": "rssi_analysis",
+        "topic": "symptoms"
+      }
+    },
+    {
+      "chunk_id": "kb_474f42182af0",
+      "text": "网络知识 · rssi_analysis · troubleshooting\n类别说明：WiFi信号强度分析\nlow_rssi: 检查距离、障碍物、天线方向、功率设置\nfluctuation: 检查干扰源、设备稳定性、环境变化\nno_signal: 检查WiFi配置、设备状态、网络连接",
+      "metadata": {
+        "source": "knowledge",
+        "category": "rssi_analysis",
+        "topic": "troubleshooting"
+      }
+    },
+    {
+      "chunk_id": "kb_5afe174d6392",
+      "text": "网络知识 · interface_analysis · states\n类别说明：网络接口状态分析\nup: 接口正常，可以传输数据\ndown: 接口关闭，无法传输数据\nunknown: 接口状态未知",
+      "metadata": {
+        "source": "knowledge",
+        "category": "interface_analysis",
+        "topic": "states"
+      }
+    },
+    {
+      "chunk_id": "kb_a058336a78ab",
+      "text": "网络知识 · interface_analysis · symptoms\n类别说明：网络接口状态分析\ninterface_down: 接口关闭会导致网络中断\nno_active_interface: 无活跃接口表示网络完全中断\ninterface_changes: 接口频繁变化表示网络不稳定",
+      "metadata": {
+        "source": "knowledge",
+        "category": "interface_analysis",
+        "topic": "symptoms"
+      }
+    },
+    {
+      "chunk_id": "kb_7ce1224ebfde",
+      "text": "网络知识 · interface_analysis · troubleshooting\n类别说明：网络接口状态分析\ninterface_down: 检查物理连接、驱动状态、配置错误\nno_active_interface: 检查网络配置、路由设置、服务状态\ninterface_changes: 检查网络稳定性、配置冲突、设备故障",
+      "metadata": {
+        "source": "knowledge",
+        "category": "interface_analysis",
+        "topic": "troubleshooting"
+      }
+    },
+    {
+      "chunk_id": "kb_75f8c6de8e9c",
+      "text": "网络知识 · quality_assessment · quality_levels\n类别说明：网络质量综合评估\nexcellent: 所有指标优秀，网络性能最佳\ngood: 大部分指标良好，网络性能良好\nfair: 部分指标一般，网络性能可接受\npoor: 多个指标较差，网络性能不佳\ncritical: 关键指标严重，网络性能极差",
+      "metadata": {
+        "source": "knowledge",
+        "category": "quality_assessment",
+        "topic": "quality_levels"
+      }
+    },
+    {
+      "chunk_id": "kb_b7265495f04e",
+      "text": "网络知识 · quality_assessment · assessment_factors\n类别说明：网络质量综合评估\n- RTT延迟\n- TCP丢包率\n- 流量稳定性\n- 信号强度\n- 接口状态",
+      "metadata": {
+        "source": "knowledge",
+        "category": "quality_assessment",
+        "topic": "assessment_factors"
+      }
+    },
+    {
+      "chunk_id": "kb_44ec4714b909",
+      "text": "网络知识 · common_issues · network_congestion\n类别说明：common_issues\nsymptoms:\n  - 高RTT\n  - 高丢包率\n  - 流量异常\ncauses:\n  - 带宽不足\n  - 设备过载\n  - 配置问题\nsolutions:\n  - 增加带宽\n  - 优化配置\n  - 负载均衡",
+      "metadata": {
+        "source": "knowledge",
+        "category": "common_issues",
+        "topic": "network_congestion"
+      }
+    },
+    {
+      "chunk_id": "kb_c858669083f5",
+      "text": "网络知识 · common_issues · hardware_failure\n类别说明：common_issues\nsymptoms:\n  - 接口down\n  - 信号丢失\n  - 流量中断\ncauses:\n  - 设备故障\n  - 线缆问题\n  - 端口损坏\nsolutions:\n  - 更换设备\n  - 检查线缆\n  - 更换端口",
+      "metadata": {
+        "source": "knowledge",
+        "category": "common_issues",
+        "topic": "hardware_failure"
+      }
+    },
+    {
+      "chunk_id": "kb_602da7eb3955",
+      "text": "网络知识 · common_issues · configuration_error\n类别说明：common_issues\nsymptoms:\n  - 连接失败\n  - 性能异常\n  - 状态错误\ncauses:\n  - 配置错误\n  - 参数不当\n  - 策略冲突\nsolutions:\n  - 检查配置\n  - 修正参数\n  - 解决冲突",
+      "metadata": {
+        "source": "knowledge",
+        "category": "common_issues",
+        "topic": "configuration_error"
+      }
+    },
+    {
+      "chunk_id": "kb_3ec29b85190f",
+      "text": "网络知识 · common_issues · environmental_interference\n类别说明：common_issues\nsymptoms:\n  - 信号波动\n  - 连接不稳定\n  - 性能下降\ncauses:\n  - 电磁干扰\n  - 物理障碍\n  - 距离过远\nsolutions:\n  - 消除干扰\n  - 调整位置\n  - 增强信号",
+      "metadata": {
+        "source": "knowledge",
+        "category": "common_issues",
+        "topic": "environmental_interference"
+      }
+    },
+    {
+      "chunk_id": "log_43b222cdf8de",
+      "text": "[网卡 eth0 | 时间窗 10:00:00~10:00:30]\nRTT 往返时延：起点 14ms，终点 14ms，峰值 14ms，基本平稳\nTCP 丢包率：起点 0.0%，终点 0.0%，峰值 0.0%\n  发送 318 包，重传 0 包\n流量：2.4MB/s，活跃连接 14 个，包速率 1150pps\n原始日志：\n  10:00:28 RTT_MONITOR: eth0 | RTT: 14ms | Quality: 1 | Using: YES | Target: 223.5.5.5\n  10:00:28 TRAFFIC_MONITOR: Total=2.4MB/s, Flows=14, PPS=1150, Interface=eth0\n  10:00:29 TCP_LOSS_MONITOR: interface=eth0 rate=0.0% delta_sent=318 delta_retrans=0 level=good",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:00:00~10:00:30",
+        "event_count": 3
+      }
+    },
+    {
+      "chunk_id": "log_fe7e6f8ad7d7",
+      "text": "[网卡 eth0 | 时间窗 10:00:30~10:01:00]\nRTT 往返时延：起点 15ms，终点 15ms，峰值 15ms，基本平稳\nTCP 丢包率：起点 0.0%，终点 0.0%，峰值 0.0%\n  发送 325 包，重传 0 包\n流量：2.5MB/s，活跃连接 15 个，包速率 1200pps\n网络质量判定：EXCELLENT（评分 92.0）\n原始日志：\n  10:00:30 网络质量变化: EXCELLENT (分数: 92.0, 接口: eth0)\n  10:00:58 RTT_MONITOR: eth0 | RTT: 15ms | Quality: 1 | Using: YES | Target: 223.5.5.5\n  10:00:58 TRAFFIC_MONITOR: Total=2.5MB/s, Flows=15, PPS=1200, Interface=eth0\n  10:00:59 TCP_LOSS_MONITOR: interface=eth0 rate=0.0% delta_sent=325 delta_retrans=0 level=good",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:00:30~10:01:00",
+        "event_count": 4
+      }
+    },
+    {
+      "chunk_id": "log_4d66d395cc7a",
+      "text": "[网卡 eth0 | 时间窗 10:01:00~10:01:30]\nRTT 往返时延：起点 88ms，终点 88ms，峰值 88ms，基本平稳\nTCP 丢包率：起点 0.4%，终点 0.4%，峰值 0.4%\n  发送 330 包，重传 2 包\n流量：2.6MB/s，活跃连接 18 个，包速率 1310pps\n原始日志：\n  10:01:28 RTT_MONITOR: eth0 | RTT: 88ms | Quality: 2 | Using: YES | Target: 223.5.5.5\n  10:01:28 TRAFFIC_MONITOR: Total=2.6MB/s, Flows=18, PPS=1310, Interface=eth0\n  10:01:29 TCP_LOSS_MONITOR: interface=eth0 rate=0.4% delta_sent=330 delta_retrans=2 level=good",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:01:00~10:01:30",
+        "event_count": 3
+      }
+    },
+    {
+      "chunk_id": "log_4196d825d6d2",
+      "text": "[网卡 eth0 | 时间窗 10:01:30~10:02:00]\nRTT 往返时延：起点 210ms，终点 210ms，峰值 210ms，基本平稳\n  RTT 超过 100ms 阈值，属于严重延迟\nTCP 丢包率：起点 3.2%，终点 3.2%，峰值 3.2%\n  丢包率超过 1%，达到影响传输效率的程度\n  发送 337 包，重传 12 包\n流量：2.7MB/s，活跃连接 23 个，包速率 1480pps\n网络质量判定：FAIR（评分 64.0）\n原始日志：\n  10:01:30 网络质量变化: FAIR (分数: 64.0, 接口: eth0)\n  10:01:58 RTT_MONITOR: eth0 | RTT: 210ms | Quality: 4 | Using: YES | Target: 223.5.5.5\n  10:01:58 TRAFFIC_MONITOR: Total=2.7MB/s, Flows=23, PPS=1480, Interface=eth0\n  10:01:59 TCP_LOSS_MONITOR: interface=eth0 rate=3.2% delta_sent=337 delta_retrans=12 level=poor",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:01:30~10:02:00",
+        "event_count": 4
+      }
+    },
+    {
+      "chunk_id": "log_c2338151f576",
+      "text": "[网卡 eth0 | 时间窗 10:02:00~10:02:30]\nRTT 往返时延：起点 195ms，终点 195ms，峰值 195ms，基本平稳\n  RTT 超过 100ms 阈值，属于严重延迟\nTCP 丢包率：起点 2.8%，终点 2.8%，峰值 2.8%\n  丢包率超过 1%，达到影响传输效率的程度\n  发送 322 包，重传 9 包\n流量：2.5MB/s，活跃连接 21 个，包速率 1400pps\n网络质量判定：POOR（评分 42.0）\n原始日志：\n  10:02:00 网络质量变化: POOR (分数: 42.0, 接口: eth0)\n  10:02:28 RTT_MONITOR: eth0 | RTT: 195ms | Quality: 4 | Using: YES | Target: 223.5.5.5\n  10:02:28 TRAFFIC_MONITOR: Total=2.5MB/s, Flows=21, PPS=1400, Interface=eth0\n  10:02:29 TCP_LOSS_MONITOR: interface=eth0 rate=2.8% delta_sent=322 delta_retrans=9 level=poor",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:02:00~10:02:30",
+        "event_count": 4
+      }
+    },
+    {
+      "chunk_id": "log_d6f12fa647aa",
+      "text": "[网卡 eth0 | 时间窗 10:03:00~10:03:30]\nRTT 往返时延：起点 16ms，终点 16ms，峰值 16ms，基本平稳\nTCP 丢包率：起点 0.0%，终点 0.0%，峰值 0.0%\n  发送 310 包，重传 0 包\n流量：2.3MB/s，活跃连接 13 个，包速率 1100pps\n原始日志：\n  10:03:28 RTT_MONITOR: eth0 | RTT: 16ms | Quality: 1 | Using: YES | Target: 223.5.5.5\n  10:03:28 TRAFFIC_MONITOR: Total=2.3MB/s, Flows=13, PPS=1100, Interface=eth0\n  10:03:29 TCP_LOSS_MONITOR: interface=eth0 rate=0.0% delta_sent=310 delta_retrans=0 level=good",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:03:00~10:03:30",
+        "event_count": 3
+      }
+    },
+    {
+      "chunk_id": "log_93ff3b0df876",
+      "text": "[网卡 eth0 | 时间窗 10:03:30~10:04:00]\n网络质量判定：EXCELLENT（评分 90.0）\n原始日志：\n  10:03:30 网络质量变化: EXCELLENT (分数: 90.0, 接口: eth0)",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:03:30~10:04:00",
+        "event_count": 1
+      }
+    },
+    {
+      "chunk_id": "log_e9335f0a5809",
+      "text": "[网卡 eth0 | 时间窗 10:20:00~10:20:30]\nRSSI 无读数（原始值 -1000，是该字段的「不适用」标记：网卡非 WiFi 或本轮未采集到。**不可理解为信号极差**）\nRTT 往返时延：16ms\nTCP 丢包率：0.0%\n流量：2.4MB/s，活跃连接 15 个，包速率 1180pps\n原始日志：\n  10:20:00 ACTIVE: eth0 | RTT: 16ms | Quality: 1 | RSSI: -1000dBm | TCP Loss: 0.0% (good) | Traffic: 2.4MB/s, 15 flows, 1180 pps",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:20:00~10:20:30",
+        "event_count": 1
+      }
+    },
+    {
+      "chunk_id": "log_fe6bbf6b3e3b",
+      "text": "[网卡 eth0 | 时间窗 10:20:30~10:21:00]\nRSSI 无读数（原始值 -1000，是该字段的「不适用」标记：网卡非 WiFi 或本轮未采集到。**不可理解为信号极差**）\nRTT 往返时延：17ms\nTCP 丢包率：0.0%\n流量：2.5MB/s，活跃连接 16 个，包速率 1200pps\n原始日志：\n  10:20:30 ACTIVE: eth0 | RTT: 17ms | Quality: 1 | RSSI: -1000dBm | TCP Loss: 0.0% (good) | Traffic: 2.5MB/s, 16 flows, 1200 pps",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:20:30~10:21:00",
+        "event_count": 1
+      }
+    },
+    {
+      "chunk_id": "log_d2babc1c8674",
+      "text": "[网卡 eth0 | 时间窗 10:21:00~10:21:30]\nRSSI 无读数（原始值 -1000，是该字段的「不适用」标记：网卡非 WiFi 或本轮未采集到。**不可理解为信号极差**）\nRTT：未采集到数据（原始值 -1，非真实延迟）\nTCP 丢包率：未采集到数据（原始值 -1.0，非真实丢包）\n流量：0.0MB/s，活跃连接 0 个，包速率 0pps\n原始日志：\n  10:21:00 ACTIVE: eth0 | RTT: -1ms | Quality: 0 | RSSI: -1000dBm | TCP Loss: -1% () | Traffic: 0.0MB/s, 0 flows, 0 pps",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:21:00~10:21:30",
+        "event_count": 1
+      }
+    },
+    {
+      "chunk_id": "log_523654d96130",
+      "text": "[网卡 eth0 | 时间窗 10:21:30~10:22:00]\nRSSI 无读数（原始值 -1000，是该字段的「不适用」标记：网卡非 WiFi 或本轮未采集到。**不可理解为信号极差**）\nRTT：未采集到数据（原始值 -1，非真实延迟）\nTCP 丢包率：未采集到数据（原始值 -1.0，非真实丢包）\n流量：0.0MB/s，活跃连接 0 个，包速率 0pps\n原始日志：\n  10:21:30 ACTIVE: eth0 | RTT: -1ms | Quality: 0 | RSSI: -1000dBm | TCP Loss: -1% () | Traffic: 0.0MB/s, 0 flows, 0 pps",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:21:30~10:22:00",
+        "event_count": 1
+      }
+    },
+    {
+      "chunk_id": "log_f50bda0635e8",
+      "text": "[网卡 eth0 | 时间窗 10:30:00~10:30:30]\nRTT 往返时延：起点 340ms，终点 340ms，峰值 340ms，基本平稳\n  RTT 超过 100ms 阈值，属于严重延迟\nTCP 丢包率：起点 6.8%，终点 6.8%，峰值 6.8%\n  丢包率超过 1%，达到影响传输效率的程度\n  发送 1204 包，重传 82 包\n流量：95.0MB/s，活跃连接 4820 个，包速率 92000pps\n原始日志：\n  10:30:00 TRAFFIC_MONITOR: Total=95.0MB/s, Flows=4820, PPS=92000, Interface=eth0\n  10:30:29 TCP_LOSS_MONITOR: interface=eth0 rate=6.8% delta_sent=1204 delta_retrans=82 level=critical\n  10:30:29 RTT_MONITOR: eth0 | RTT: 340ms | Quality: 4 | Using: YES | Target: 223.5.5.5",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:30:00~10:30:30",
+        "event_count": 3
+      }
+    },
+    {
+      "chunk_id": "log_3fdc9b72e0dc",
+      "text": "[网卡 eth0 | 时间窗 10:30:30~10:31:00]\n网络质量判定：POOR（评分 21.0）\n原始日志：\n  10:30:30 网络质量变化: POOR (分数: 21.0, 接口: eth0)",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:30:30~10:31:00",
+        "event_count": 1
+      }
+    },
+    {
+      "chunk_id": "log_fdbadbd50981",
+      "text": "[网卡 eth0 | 时间窗 10:31:00~10:31:30]\nTCP 丢包率：起点 7.4%，终点 7.4%，峰值 7.4%\n  丢包率超过 1%，达到影响传输效率的程度\n  发送 1310 包，重传 97 包\n原始日志：\n  10:31:29 TCP_LOSS_MONITOR: interface=eth0 rate=7.4% delta_sent=1310 delta_retrans=97 level=critical",
+      "metadata": {
+        "source": "log",
+        "interface": "eth0",
+        "time_window": "10:31:00~10:31:30",
+        "event_count": 1
+      }
+    },
+    {
+      "chunk_id": "log_b3639ed5a128",
+      "text": "[网卡 wlan0 | 时间窗 10:10:00~10:10:30]\nRTT 往返时延：起点 22ms，终点 22ms，峰值 22ms，基本平稳\nWiFi 信号强度 RSSI：起点 -62dBm，终点 -62dBm\n原始日志：\n  10:10:00 RSSI监控: wlan0 = -62dBm (质量:1, 使用:NO)\n  10:10:00 RTT_MONITOR: wlan0 | RTT: 22ms | Quality: 1 | Using: NO | Target: 114.114.114.114",
+      "metadata": {
+        "source": "log",
+        "interface": "wlan0",
+        "time_window": "10:10:00~10:10:30",
+        "event_count": 2
+      }
+    },
+    {
+      "chunk_id": "log_eb3b0af92800",
+      "text": "[网卡 wlan0 | 时间窗 10:10:30~10:11:00]\nRTT 往返时延：起点 48ms，终点 48ms，峰值 48ms，基本平稳\nWiFi 信号强度 RSSI：起点 -74dBm，终点 -74dBm\n原始日志：\n  10:10:30 RSSI监控: wlan0 = -74dBm (质量:2, 使用:NO)\n  10:10:30 RTT_MONITOR: wlan0 | RTT: 48ms | Quality: 2 | Using: NO | Target: 114.114.114.114",
+      "metadata": {
+        "source": "log",
+        "interface": "wlan0",
+        "time_window": "10:10:30~10:11:00",
+        "event_count": 2
+      }
+    },
+    {
+      "chunk_id": "log_d4a0d2fb25a7",
+      "text": "[网卡 wlan0 | 时间窗 10:11:00~10:11:30]\nRTT 往返时延：起点 133ms，终点 133ms，峰值 133ms，基本平稳\n  RTT 超过 100ms 阈值，属于严重延迟\nWiFi 信号强度 RSSI：起点 -88dBm，终点 -88dBm\n  信号强度低于 -80dBm，属于弱信号，会导致速率下降\n原始日志：\n  10:11:00 RSSI监控: wlan0 = -88dBm (质量:3, 使用:NO)\n  10:11:00 RTT_MONITOR: wlan0 | RTT: 133ms | Quality: 3 | Using: NO | Target: 114.114.114.114",
+      "metadata": {
+        "source": "log",
+        "interface": "wlan0",
+        "time_window": "10:11:00~10:11:30",
+        "event_count": 2
+      }
+    },
+    {
+      "chunk_id": "log_f4a28482f42d",
+      "text": "[网卡 wlan0 | 时间窗 10:11:30~10:12:00]\nRTT 往返时延：起点 180ms，终点 180ms，峰值 180ms，基本平稳\n  RTT 超过 100ms 阈值，属于严重延迟\nWiFi 信号强度 RSSI：起点 -91dBm，终点 -91dBm\n  信号强度低于 -80dBm，属于弱信号，会导致速率下降\n原始日志：\n  10:11:30 RSSI监控: wlan0 = -91dBm (质量:4, 使用:NO)\n  10:11:30 RTT_MONITOR: wlan0 | RTT: 180ms | Quality: 4 | Using: NO | Target: 114.114.114.114",
+      "metadata": {
+        "source": "log",
+        "interface": "wlan0",
+        "time_window": "10:11:30~10:12:00",
+        "event_count": 2
+      }
+    },
+    {
+      "chunk_id": "log_115b7d90b270",
+      "text": "[网卡 wlan0 | 时间窗 10:12:00~10:12:30]\n网络质量判定：POOR（评分 38.0）\n原始日志：\n  10:12:00 网络质量变化: POOR (分数: 38.0, 接口: wlan0)",
+      "metadata": {
+        "source": "log",
+        "interface": "wlan0",
+        "time_window": "10:12:00~10:12:30",
+        "event_count": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NetPulse — 网络诊断 Agent</title>
+<!-- 内联 favicon：不写的话浏览器会去要 /favicon.ico，控制台里留一条 404。
+     用 data URI 而不是外部文件，是为了保持"零外部请求、可完全离线" -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><path d='M7 20l5-6 5 4 8-9' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<style>
+/* ==========================================================================
+   配色
+   --------------------------------------------------------------------------
+   状态色（good / warning / critical）取自一套经过校验的固定状态色板，
+   不做主题化 —— 语义色换主题会让人认不出来。
+
+   ⚠️ 两条硬规则，写在最前面免得后面忘：
+     1. 状态**永远不能只靠颜色表达** —— 每个状态标记旁边必须有图标和文字。
+        （红绿对色盲用户不可分，颜色只是加速识别，不是唯一信息通道）
+     2. 低对比度的状态色（warning 在浅色背景上只有 1.79:1）**只能当标记和
+        边框用，不能当文字颜色** —— 文字一律用 text token。
+   ========================================================================== */
+:root {
+  color-scheme: light;
+
+  --plane:          #f9f9f7;   /* 页面底色 */
+  --surface:        #fcfcfb;   /* 卡片 */
+  --surface-2:      #f2f2ef;   /* 次级卡片 / 代码块 */
+  --text-primary:   #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted:     #898781;
+  --border:         rgba(11,11,11,0.10);
+  --gridline:       #e1e0d9;
+  --baseline:       #c3c2b7;
+
+  --accent:         #2a78d6;   /* 模型活动（分类色板 1 号槽） */
+  --accent-soft:    rgba(42,120,214,0.10);
+
+  /* 状态色：固定，不随主题变 */
+  --good:           #0ca30c;
+  --warning:        #fab219;
+  --critical:       #d03b3b;
+  --good-text:      #006300;   /* 状态色当文字用时的替身（对比度够） */
+  --critical-text:  #b02a2a;
+
+  --radius: 10px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plane:          #0d0d0d;
+    --surface:        #1a1a19;
+    --surface-2:      #232322;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --border:         rgba(255,255,255,0.10);
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --accent:         #3987e5;
+    --accent-soft:    rgba(57,135,229,0.16);
+    --good-text:      #0ca30c;
+    --critical-text:  #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane:          #0d0d0d;
+  --surface:        #1a1a19;
+  --surface-2:      #232322;
+  --text-primary:   #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted:     #898781;
+  --border:         rgba(255,255,255,0.10);
+  --gridline:       #2c2c2a;
+  --baseline:       #383835;
+  --accent:         #3987e5;
+  --accent-soft:    rgba(57,135,229,0.16);
+  --good-text:      #0ca30c;
+  --critical-text:  #e66767;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--plane);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.wrap { max-width: 900px; margin: 0 auto; padding: 24px 20px 80px; }
+
+/* ---------- 顶栏 ---------- */
+header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--text-muted); font-size: 12px; }
+.spacer { flex: 1; }
+button {
+  font: inherit; cursor: pointer; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); padding: 6px 12px;
+  transition: background .12s, color .12s;
+}
+button:hover { background: var(--surface-2); color: var(--text-primary); }
+button.primary {
+  background: var(--accent); color: #fff; border-color: transparent;
+  font-weight: 600; padding: 9px 20px;
+}
+button.primary:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---------- 输入区 ---------- */
+.ask { display: flex; gap: 10px; }
+input[type=text] {
+  flex: 1; font: inherit; padding: 10px 14px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-primary);
+}
+input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chip {
+  font-size: 12px; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); cursor: pointer;
+}
+.chip:hover { color: var(--text-primary); background: var(--surface-2); }
+
+/* ---------- 状态条 ---------- */
+.status {
+  display: flex; align-items: center; gap: 8px; margin-top: 14px;
+  font-size: 12px; color: var(--text-muted); min-height: 20px;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--baseline); flex: none; }
+.dot.live { background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+.dot.ok   { background: var(--good); }
+.dot.err  { background: var(--critical); }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+
+/* ---------- KPI 行 ----------
+   stat tile 的约定：label 用句式大小写、不带冒号；value 用半粗体 +
+   比例数字（**不要** tabular-nums —— 那是给需要竖向对齐的表格列用的，
+   大号数字用等宽会显得松散） */
+.kpis { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+.kpi {
+  flex: 1 1 120px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+}
+.kpi .label { font-size: 12px; color: var(--text-muted); }
+.kpi .value { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
+.kpi .value small { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
+
+/* ---------- 工具过滤行（放内容上方，一行） ---------- */
+.filters { display: flex; gap: 8px; align-items: center; margin: 22px 0 10px; flex-wrap: wrap; }
+.filters .flabel { font-size: 12px; color: var(--text-muted); }
+.toggle {
+  font-size: 12px; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); cursor: pointer; user-select: none;
+}
+.toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+/* 演示模式按钮：和过滤器用的是同一套"按下"视觉，保持一致性 */
+#demo[aria-pressed="true"] {
+  background: var(--accent-soft); color: var(--accent); border-color: transparent;
+}
+.hint {
+  margin-top: 12px; padding: 10px 12px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  font-size: 12px; color: var(--text-secondary); line-height: 1.65;
+  /* pre-line：保留换行、折叠多余空格。
+     服务端返回的 hints 是多行的（带命令和缩进），不加这个会挤成一坨看不清 */
+  white-space: pre-line;
+}
+.hint code {
+  font-family: var(--mono); font-size: 11.5px;
+  background: var(--surface-2); padding: 1px 4px; border-radius: 4px;
+}
+.hint button {
+  font-size: 12px; padding: 3px 10px; margin-left: 8px;
+}
+
+/* 工具失败/被拦截时直接显示的原因块 */
+.errmsg {
+  margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+  background: var(--surface-2); border-left: 3px solid var(--critical);
+  font-size: 12px; color: var(--text-secondary);
+  white-space: pre-wrap; word-break: break-word;
+}
+.errmsg.warn-msg { border-left-color: var(--warning); }
+.errmsg .muted { color: var(--text-muted); }
+
+/* ---------- 时间线 ---------- */
+.timeline { position: relative; padding-left: 26px; }
+.timeline::before {
+  content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px;
+  width: 2px; background: var(--gridline);
+}
+.node { position: relative; margin-bottom: 16px; }
+.node::before {
+  content: ""; position: absolute; left: -24px; top: 7px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--baseline); border: 2px solid var(--plane);
+}
+.node.thought::before { background: var(--accent); }
+.node.good::before    { background: var(--good); }
+.node.error::before   { background: var(--critical); }
+.node.warn::before    { background: var(--warning); }
+.node.answer::before  { background: var(--accent); width: 12px; height: 12px; left: -25px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+}
+.card.question { border-left: 3px solid var(--accent); }
+.card.answer   { border-left: 3px solid var(--accent); }
+
+/* 事件头：图标 + 名称 + 状态标签 + 耗时。
+   状态**必须有文字标签**，颜色只是加速识别 —— 见文件开头的规则 1 */
+.evhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.icon { font-size: 13px; flex: none; }
+.name { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+.tag {
+  font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-secondary);
+}
+.tag.good { color: var(--good-text); border-color: var(--good); }
+.tag.err  { color: var(--critical-text); border-color: var(--critical); }
+.tag.warn { color: var(--text-secondary); border-color: var(--warning); }
+.ms { font-size: 11px; color: var(--text-muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.thought-text { color: var(--text-secondary); white-space: pre-wrap; }
+.args { font-family: var(--mono); font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+
+details { margin-top: 8px; }
+summary {
+  cursor: pointer; font-size: 12px; color: var(--text-muted);
+  list-style: none; user-select: none;
+}
+summary::-webkit-details-marker { display: none; }
+summary::before { content: "▸ "; }
+details[open] summary::before { content: "▾ "; }
+pre {
+  background: var(--surface-2); border-radius: 8px; padding: 10px 12px;
+  overflow-x: auto; font-family: var(--mono); font-size: 11.5px;
+  line-height: 1.5; margin: 8px 0 0; max-height: 340px;
+  font-variant-numeric: tabular-nums;   /* 表格/JSON 列要对齐，这里用等宽数字 */
+}
+
+/* ---------- 结论的 markdown 渲染 ---------- */
+.md h2 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
+.md h2:first-child { margin-top: 0; }
+.md p { margin: 6px 0; }
+.md ul { margin: 6px 0; padding-left: 20px; }
+.md li { margin: 2px 0; }
+.md strong { font-weight: 600; }
+.md code { font-family: var(--mono); font-size: 12.5px; background: var(--surface-2);
+           padding: 1px 5px; border-radius: 4px; }
+
+.empty { color: var(--text-muted); text-align: center; padding: 60px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>NetPulse 网络诊断</h1>
+    <span class="sub">eBPF 采集 · 混合检索 · ReAct Agent</span>
+    <span class="spacer"></span>
+    <button id="demo" aria-pressed="false"
+            title="用假模型 + 假工具跑，不需要 API Key、不需要 C++ 服务">演示模式</button>
+    <button id="theme" title="切换主题">◐ 自动</button>
+  </header>
+
+  <div class="ask">
+    <input type="text" id="q" placeholder="用一句话描述你遇到的网络问题…" autocomplete="off">
+    <button class="primary" id="go">诊断</button>
+  </div>
+  <div class="examples" id="examples"></div>
+
+  <div class="status"><span class="dot" id="dot"></span><span id="statusText">就绪</span></div>
+
+  <div class="kpis" id="kpis" hidden></div>
+
+  <div class="filters" id="filters" hidden>
+    <span class="flabel">显示</span>
+    <button class="toggle" id="tTools"   aria-pressed="true">工具调用</button>
+    <button class="toggle" id="tResults" aria-pressed="true">工具返回</button>
+    <button class="toggle" id="tThought" aria-pressed="true">模型思考</button>
+  </div>
+
+  <div class="timeline" id="timeline">
+    <div class="empty" id="empty">还没有诊断记录<br>上面输入一个问题，或者点一个示例</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ==========================================================================
+   为什么要先 escape 再渲染
+   --------------------------------------------------------------------------
+   页面里显示的文本有两个来源：模型生成的结论、工具返回的数据。
+   **两个都不能信** —— 工具返回的内容最终来自网络数据（连接明细里有对端 IP
+   之类），模型输出更是不可控。
+
+   直接 innerHTML 就等于把这些内容当代码执行。所以渲染前一律转义，
+   再对**转义后**的文本做轻量 markdown 处理。
+   ========================================================================== */
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/* 极简 markdown：只处理 ## 标题、**粗体**、- 列表、`代码`。
+   故意不引第三方库（页面要求零外部依赖），也不追求完整 ——
+   模型输出的是固定格式的诊断结论，这几种够了。 */
+function md(text) {
+  const lines = esc(text).split("\n");
+  let out = [], list = false;
+  const inline = (s) => s
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/`(.+?)`/g, "<code>$1</code>");
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (/^#{1,6}\s+/.test(line)) {
+      if (list) { out.push("</ul>"); list = false; }
+      out.push("<h2>" + inline(line.replace(/^#{1,6}\s+/, "")) + "</h2>");
+    } else if (/^\s*[-·*]\s+/.test(line)) {
+      if (!list) { out.push("<ul>"); list = true; }
+      out.push("<li>" + inline(line.replace(/^\s*[-·*]\s+/, "")) + "</li>");
+    } else if (/^\s*\d+[.、]\s+/.test(line)) {
+      if (!list) { out.push("<ul>"); list = true; }
+      out.push("<li>" + inline(line.replace(/^\s*\d+[.、]\s+/, "")) + "</li>");
+    } else if (line === "") {
+      if (list) { out.push("</ul>"); list = false; }
+    } else {
+      if (list) { out.push("</ul>"); list = false; }
+      out.push("<p>" + inline(line) + "</p>");
+    }
+  }
+  if (list) out.push("</ul>");
+  return out.join("");
+}
+
+/* ---------- 主题 ---------- */
+const THEMES = ["auto", "light", "dark"];
+let themeIdx = 0;
+const themeBtn = document.getElementById("theme");
+themeBtn.onclick = () => {
+  themeIdx = (themeIdx + 1) % THEMES.length;
+  const t = THEMES[themeIdx];
+  document.documentElement.setAttribute("data-theme", t);
+  themeBtn.textContent = "◐ " + (t === "auto" ? "自动" : t === "light" ? "浅色" : "深色");
+};
+
+/* ---------- 演示模式 ----------
+   没有它的话，第一次打开页面必须先把 API Key、C++ 服务、RAG 索引全配齐，
+   否则一点"诊断"看到的就是一句报错。而演示模式用假模型 + 假工具，
+   零配置就能把整条推理链和界面演一遍 —— 这对演示和录屏很关键：
+   **演示不该依赖一堆现场才能配好的东西。** */
+let demoOn = new URLSearchParams(location.search).has("demo");
+const demoBtn = document.getElementById("demo");
+function renderDemoBtn() {
+  demoBtn.setAttribute("aria-pressed", String(demoOn));
+  demoBtn.textContent = demoOn ? "演示模式 · 开" : "演示模式";
+}
+demoBtn.onclick = () => { demoOn = !demoOn; renderDemoBtn(); };
+renderDemoBtn();
+
+/* 启动时探一下环境，缺东西就直接告诉用户 —— 而不是等他点了诊断才报错。
+ *
+ * ⚠️ 这里用服务端返回的 `hints`，**不在前端自己拼原因**。
+ * 第一版是在前端判断的：
+ *     if (!c.dbus_python || !c.netpulse_service) missing.push("C++ 服务没在跑");
+ * 这一句把两个完全不同的原因（没装 dbus-python / 服务真没起）归成了一句话，
+ * 于是明明只是少装一个 apt 包，却显示成"你的 C++ 服务没启动" ——
+ * 用户会去反复重启一个本来就跑得好好的服务。
+ * 原因判断放在服务端（那里知道原始错误），前端只负责显示。 */
+fetch("/api/health").then((r) => r.json()).then((h) => {
+  const hints = h.hints || [];
+  if (hints.length && !demoOn) {
+    const box = document.createElement("div");
+    box.className = "hint";
+    // hints 是多行文本，join 用 \n 配合 CSS 的 white-space: pre-line
+    // （原来 join("<br>") + 文本里的 \n 会变成双重换行）
+    box.innerHTML =
+      "<b>环境检查</b>\n" +
+      hints
+        .map((t) => "· " + esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"))
+        .join("\n") +
+      `\n\n<button id="hintDemo">打开演示模式（不用配环境）</button>`;
+    document.querySelector(".status").after(box);
+    document.getElementById("hintDemo").onclick = () => {
+      demoOn = true; renderDemoBtn(); box.remove();
+    };
+  }
+}).catch(() => {});
+
+/* ---------- 示例问题 ---------- */
+const EXAMPLES = [
+  "网络很卡，帮我看看是什么问题",
+  "eth0 最近是不是有问题",
+  "10:02 前后发生了什么",
+  "WiFi 信号弱该怎么处理",
+];
+const exBox = document.getElementById("examples");
+EXAMPLES.forEach((q) => {
+  const b = document.createElement("span");
+  b.className = "chip";
+  b.textContent = q;
+  b.onclick = () => { document.getElementById("q").value = q; go(); };
+  exBox.appendChild(b);
+});
+
+/* ---------- 界面元素 ---------- */
+const qEl = document.getElementById("q");
+const goBtn = document.getElementById("go");
+const dot = document.getElementById("dot");
+const statusText = document.getElementById("statusText");
+const timeline = document.getElementById("timeline");
+const emptyEl = document.getElementById("empty");
+const kpis = document.getElementById("kpis");
+const filters = document.getElementById("filters");
+
+function setStatus(kind, text) {
+  dot.className = "dot" + (kind ? " " + kind : "");
+  statusText.textContent = text;
+}
+
+/* ---------- 时间线渲染 ---------- */
+/* rounds 由服务端的 finish 事件给出，**不在前端自己数**。
+   一开始我在 thought 回调里 `roundNo++`，然后把它忘了 ——
+   KPI 读的是 stats.rounds，于是页面上明明画了 5 轮思考，
+   角标却显示 0。这个 bug 在 DOM 断言里一眼看出来，但在页面上很容易被忽略。
+   现在的做法是拿服务端的权威值，前端不重复计算。 */
+const stats = { rounds: 0, toolCalls: 0, errors: 0, interventions: 0, serverMs: 0 };
+
+function clearTimeline() {
+  timeline.innerHTML = "";
+  stats.rounds = 0; stats.toolCalls = 0; stats.errors = 0;
+  stats.interventions = 0; stats.serverMs = 0;
+  kpis.hidden = true;
+  filters.hidden = false;
+}
+
+function addNode(cls, html, group) {
+  const node = document.createElement("div");
+  node.className = "node " + cls;
+  if (group) node.dataset.group = group;
+  node.innerHTML = html;
+  timeline.appendChild(node);
+  node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  return node;
+}
+
+function addQuestion(text) {
+  addNode("", '<div class="card question"><div class="evhead">' +
+    '<span class="icon">❯</span><span class="name">你的问题</span></div>' +
+    '<div style="margin-top:4px">' + esc(text) + '</div></div>');
+}
+
+function showKpis(localElapsedMs) {
+  // 用服务端报的耗时（它计的是真正的诊断时长）；
+  // 前端测的是"从订阅到结束"，会漏掉请求往返那一段
+  const ms = stats.serverMs || localElapsedMs;
+  kpis.innerHTML = `
+    <div class="kpi"><div class="label">推理轮次</div><div class="value">${stats.rounds}</div></div>
+    <div class="kpi"><div class="label">工具调用</div><div class="value">${stats.toolCalls}</div></div>
+    <div class="kpi"><div class="label">耗时</div><div class="value">${(ms / 1000).toFixed(1)}<small>s</small></div></div>
+    <div class="kpi"><div class="label">工具报错</div><div class="value">${stats.errors}</div></div>
+    <div class="kpi"><div class="label">被拦截的重复调用</div><div class="value">${stats.interventions}</div></div>`;
+  kpis.hidden = false;
+}
+
+/* ---------- 发起诊断 ---------- */
+let currentStream = null;
+
+async function go() {
+  const question = qEl.value.trim();
+  if (!question) return;
+  if (currentStream) { currentStream.close(); currentStream = null; }
+
+  clearTimeline();
+  addQuestion(question);
+  goBtn.disabled = true;
+  setStatus("live", "正在诊断…");
+
+  let runId;
+  try {
+    const res = await fetch("/api/diagnose", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, demo: demoOn }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    runId = (await res.json()).run_id;
+  } catch (err) {
+    setStatus("err", "发起失败：" + err.message);
+    goBtn.disabled = false;
+    return;
+  }
+
+  subscribe(runId);
+}
+
+function subscribe(runId) {
+  // EventSource 断线会自动重连，并带上 Last-Event-ID —— 服务端据此续传，
+  // 不会重跑诊断。详见 web/runstore.py 的说明。
+  const es = new EventSource(`/api/diagnose/${runId}/stream`);
+  currentStream = es;
+  const started = performance.now();
+
+  const done = (extra) => {
+    es.close();
+    currentStream = null;
+    goBtn.disabled = false;
+    showKpis(performance.now() - started);
+    setStatus(extra || "ok", extra ? "诊断失败" : "完成");
+  };
+
+  es.addEventListener("thought", (e) => {
+    const d = JSON.parse(e.data);
+    addNode("thought",
+      `<div class="card"><div class="evhead"><span class="icon">💭</span>
+       <span class="name">第 ${d.round} 轮思考</span></div>
+       <div class="thought-text" style="margin-top:4px">${esc(d.text)}</div></div>`,
+      "thought");
+  });
+
+  es.addEventListener("tool_result", (e) => {
+    const d = JSON.parse(e.data);
+    stats.toolCalls++;
+    const args = JSON.stringify(d.arguments || {});
+    let cls = "good", icon = "🔧", tag = '<span class="tag good">成功</span>';
+
+    if (d.intervention) {
+      // 被容错机制拦截。这是**唯一能证明容错真的在工作**的地方，
+      // 所以给它一个显眼但不刺眼的标记（warning + ⛔ + 文字说明）
+      stats.interventions++;
+      cls = "warn"; icon = "⛔";
+      tag = `<span class="tag warn">已拦截</span>`;
+    } else if (d.is_error) {
+      stats.errors++;
+      cls = "error"; icon = "❌";
+      tag = '<span class="tag err">失败</span>';
+    }
+
+    // 失败原因**直接显示出来**，不要藏在折叠面板里。
+    // 原来错误信息只在"工具返回"的折叠区里，用户看到的是一行"失败"却不知道为什么 ——
+    // 而工具失败恰恰是最需要解释的一件事（是环境没配？还是参数错了？）
+    let extra = "";
+    if (d.intervention) {
+      extra = `<div class="errmsg warn-msg">
+           ⛔ ${esc(d.intervention)}<br>
+           <span class="muted">（模型重复调用了同一个工具，已被拦下并回灌提醒）</span></div>`;
+    } else if (d.is_error) {
+      let msg = "";
+      try { msg = JSON.parse(d.raw || "{}").error || ""; } catch (_) { msg = d.raw || ""; }
+      extra = `<div class="errmsg">❌ ${esc(msg || "调用失败，展开下方查看原始返回")}</div>`;
+    }
+
+    addNode(cls,
+      `<div class="card">
+        <div class="evhead"><span class="icon">${icon}</span>
+          <span class="name">${esc(d.name)}</span>${tag}
+          <span class="ms">${Math.round(d.elapsed_ms || 0)} ms</span></div>
+        <div class="args">${esc(args)}</div>${extra}
+        <details><summary>工具返回</summary><pre>${esc(d.raw || "")}</pre></details>
+      </div>`,
+      d.is_error || d.intervention ? "result" : "result");
+  });
+
+  es.addEventListener("memory_recall", (e) => {
+    const d = JSON.parse(e.data);
+    const items = (d.items || []).map((s) => "· " + esc(s)).join("<br>");
+    addNode("thought",
+      `<div class="card"><div class="evhead"><span class="icon">🧠</span>
+       <span class="name">想起 ${d.count} 条过往诊断</span></div>
+       <div style="margin-top:4px;color:var(--text-secondary);font-size:12px">${items}</div></div>`,
+      "thought");
+  });
+
+  es.addEventListener("final", (e) => {
+    const d = JSON.parse(e.data);
+    addNode("answer",
+      `<div class="card answer"><div class="evhead"><span class="icon">✓</span>
+       <span class="name">诊断结论</span></div>
+       <div class="md" style="margin-top:6px">${md(d.text)}</div></div>`);
+  });
+
+  es.addEventListener("forcing_conclusion", () => {
+    setStatus("live", "达到上限，正在用已有数据收尾…");
+  });
+
+  es.addEventListener("error", (e) => {
+    let msg = "生成失败";
+    try { msg = JSON.parse(e.data).message || msg; } catch (_) {}
+    addNode("error",
+      `<div class="card"><div class="evhead"><span class="icon">⚠</span>
+       <span class="name">出错了</span></div>
+       <div style="margin-top:4px">${esc(msg)}</div></div>`);
+  });
+
+  // finish 带的是服务端的权威统计（轮次、结束原因）。前端只负责显示。
+  es.addEventListener("finish", (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (typeof d.rounds === "number") stats.rounds = d.rounds;
+    } catch (_) {}
+  });
+
+  es.addEventListener("done", (e) => {
+    let payload = {};
+    try { payload = JSON.parse(e.data); } catch (_) {}
+    if (payload.elapsed_ms) stats.serverMs = payload.elapsed_ms;
+    done(payload.error ? "err" : null);
+  });
+
+  es.onerror = () => {
+    // EventSource 会自动重连（ReadyState=CONNECTING）。只有彻底关闭时才收工。
+    if (es.readyState === EventSource.CLOSED) done("err");
+  };
+}
+
+/* ---------- 过滤器 ---------- */
+const toggles = {
+  tools:   { el: document.getElementById("tTools"),   groups: [] },
+  results: { el: document.getElementById("tResults"), groups: ["result"] },
+  thought: { el: document.getElementById("tThought"), groups: ["thought"] },
+};
+Object.values(toggles).forEach((t) => {
+  t.el.onclick = () => {
+    const on = t.el.getAttribute("aria-pressed") !== "true";
+    t.el.setAttribute("aria-pressed", String(on));
+    document.querySelectorAll(".node").forEach((n) => {
+      if (t.groups.includes(n.dataset.group)) n.hidden = !on;
+    });
+  };
+});
+
+goBtn.onclick = go;
+qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+qEl.focus();
+</script>
+</body>
+</html>
