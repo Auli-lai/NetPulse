@@ -361,16 +361,3 @@ C4. --lite 模式报缺 psutil
     cd agent && python main.py -q "网络很卡"  命令行单次提问
     cd agent && python main.py --dry-run      离线演示（不需要任何依赖）
 
-
-================================================================================
-八、上传 GitHub 前（30 秒）
-================================================================================
-
-仓库根目录已有 .gitignore 和 .dockerignore，**确认它们存在且未被修改**
-再 git add。三条红线：
-
-    · .env                 真 API Key，绝不提交
-    · agent/memory_store/  你的真实诊断数据（memories.jsonl），是用户数据
-    · server/bin、server/build、__pycache__、logs/   二进制与运行时产物
-
-详细清单见 README「上线与分发」一节。
