@@ -1,0 +1,376 @@
+================================================================================
+NetPulse 使用手册 —— 从零到跑起来
+================================================================================
+
+30 秒速查：按你手上有什么，选一条路
+
+    你只有 Windows，不想装别的        python start.py --lite
+    你愿意装个 Docker                 cd deploy && docker compose up --build
+    你有 WSL（要完整功能）             python start.py
+    你只想看看界面，什么都不装         python start.py --web-only
+                                        然后打开 http://127.0.0.1:8000/?demo
+
+四条路共用同一套 Agent / 工具 / 前端，差的只是数据从哪来。下文按
+"第一次配置 → 日常启动 → 排错"组织，第一次用请按顺序读。
+
+
+================================================================================
+一、这个项目由哪几块组成
+================================================================================
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │  浏览器  http://127.0.0.1:8000                              │
+    │    └─ web/（FastAPI + SSE 实时推送推理过程）                 │
+    │         └─ agent/（ReAct 循环 + 8 个工具 + 两层记忆）        │
+    │              ├─ D-Bus ─► server/bin/weaknet-dbus-server     │
+    │              │            （C++，eBPF 采集连接级流量）       │
+    │              ├─ host_bridge.py（WSL 下查 Windows 宿主 WiFi） │
+    │              ├─ rag/（历史日志 + 知识库混合检索）            │
+    │              └─ 百炼 API（Qwen，出自然语言结论）             │
+    └─────────────────────────────────────────────────────────────┘
+
+四条外部依赖（C++ 服务 / dbus / 检索索引 / API Key）**缺任何一条都不会让
+程序崩** —— 对应工具返回错误，模型看得到并会绕开。这是有意的降级设计。
+
+
+================================================================================
+二、环境要求（按模式分）
+================================================================================
+
+完整模式（python start.py）
+    · 操作系统：Linux，或 Windows 的 WSL2（Ubuntu 22.04/24.04 实测）
+      —— eBPF 是 Linux 内核特性，原生 Windows/macOS 上没有
+    · Python 3.10+
+    · 编译链：g++、make、clang、pkg-config、libdbus-1-dev、libglog-dev、
+      libelf-dev、libbpf-dev（装法见 3.2）
+    · dbus 工具：dbus-daemon / dbus-send（sudo apt install dbus）
+    · 权限：不需要 root。启动器用 setcap 给服务端精确 capability
+
+轻量模式（python start.py --lite）
+    · 任意操作系统（Windows / macOS / Linux 均可）
+    · Python 3.10+ 和 psutil（pip install psutil）
+    · 不需要编译链、不需要 Linux、不需要 D-Bus
+    · 代价：拿不到 eBPF 的连接级速率（get_flows 的 bps/pps 恒 0），
+      其余指标（网卡列表 / RTT / 丢包 / 实时流量 / 连接明细）都是真的
+
+Docker 模式（deploy/docker-compose.yml）
+    · 只要 Docker Desktop 或 Docker Engine
+    · 镜像里自带编译链，构建时装好一切
+    · 注意：容器里服务端看到的是容器自己的网卡；要监控你机器的真实
+      网卡，请在宿主机跑 start.py（README「上线与分发」有完整说明）
+
+API Key（所有模式可选）
+    · 百炼（DashScope）的 key，https://bailian.console.aliyun.com/ 创建
+    · 没有也能跑采集和检索，只是没有自然语言结论；演示模式不需要 key
+
+
+================================================================================
+三、第一次配置（只做一次）
+================================================================================
+
+---- 3.1 拿代码，放对位置 ------------------------------------------------
+
+WSL 用户注意：项目放在 /mnt/e/... 能跑，但**跨文件系统 IO 慢很多**，
+建议挪到 WSL 自己的文件系统：
+
+    cp -r "/mnt/e/Vscode projects/net-pluse" ~/netpulse
+    cd ~/netpulse
+
+---- 3.2 装编译依赖 + 编译 C++（完整模式；轻量/Docker 模式跳过）---------
+
+    sudo apt-get install -y build-essential clang llvm pkg-config \
+      libdbus-1-dev libglog-dev libelf-dev zlib1g-dev libcap-dev \
+      linux-headers-$(uname -r) libbpf-dev
+    make                    # 产出 server/bin/weaknet-dbus-server
+                            # 和 server/build/flow_rate.bpf.o
+
+---- 3.3 装系统包 --------------------------------------------------------
+
+    sudo apt install dbus python3-dbus
+    # dbus        ：总线（dbus-daemon / dbus-send）
+    # python3-dbus：客户端库。注意它装给系统 Python，venv 要用它得
+    #               python3 -m venv --system-site-packages .venv
+
+---- 3.4 建 Python 虚拟环境并装依赖 --------------------------------------
+
+    python3 -m venv --system-site-packages .venv
+    source .venv/bin/activate
+    pip install -r rag/requirements.txt    -i https://mirrors.aliyun.com/pypi/simple/
+    pip install -r agent/requirements.txt  -i https://mirrors.aliyun.com/pypi/simple/
+    pip install -r web/requirements.txt    -i https://mirrors.aliyun.com/pypi/simple/
+
+轻量模式额外需要：pip install psutil（agent/requirements.txt 里已有，
+装上面那份就带上）。
+
+---- 3.5 建检索索引 ------------------------------------------------------
+
+    cd rag && python build_index.py --sample && cd ..
+
+不建也能跑，但 search_network_history 工具会报错，模型会绕开。
+
+---- 3.6 配 API Key（可选，但建议配）-------------------------------------
+
+    cp .env.example .env
+    # 编辑 .env，把 QWEN_API_KEY=sk-在这里填你的key 换成真 key
+
+.env 的规则（rag/config.py 的 _load_dotenv）：
+    · 项目根目录的 .env 会被所有入口（agent / web / mcp）自动读
+    · **不覆盖已经 export 的环境变量** —— 临时 export 优先
+    · .env 里有真密钥，**不要提交到 git**（.gitignore 已排除）
+
+等效的临时方式（不写文件）：
+
+    export QWEN_API_KEY='sk-你的百炼key'        # bash
+    $env:QWEN_API_KEY='sk-你的百炼key'          # PowerShell
+
+三个常见陷阱：
+    · 在 A 终端 export，在 B 终端起服务 —— 环境变量不跨终端
+    · 在 PowerShell 里 export，服务跑在 WSL 里 —— 两个独立环境
+    · 改完不重启 —— 环境变量是进程启动时读的，运行中的进程拿不到新值
+
+
+================================================================================
+四、日常启动
+================================================================================
+
+---- 4.1 一条命令（推荐）-------------------------------------------------
+
+    python start.py
+
+它自动做完原来要四个终端的事：
+    ① 找到或新建一条 session 总线（WSL 默认没有 systemd，得自己起；
+       地址写进项目根的 .dbus-address，别的终端也能用）
+    ② 给服务端二进制准备 capability（已有 → 跳过；能 setcap → 原地设；
+       /mnt/e 上 setcap 不支持 → 自动拷到 ~/.netpulse-server 再设）
+    ③ cd 到 server/bin 起服务端（eBPF 对象路径是相对的，cwd 不对会
+       静默降级），等它在总线上注册 com.example.WeakNet
+    ④ 起 uvicorn，并把总线地址注入它的环境 —— 所以你永远不用再
+      手动 export DBUS_SESSION_BUS_ADDRESS
+然后自动打开浏览器。Ctrl-C 两个进程一起停。
+
+其它参数：
+
+    python start.py --lite        # 轻量模式（无 Linux/WSL 的机器）
+    python start.py --web-only    # 只要 Web（演示模式可用）
+    python start.py --port 8080   # 换端口
+    python start.py --no-browser  # 不自动开浏览器
+
+---- 4.2 手动两终端（老办法，想分清每一步时用）--------------------------
+
+终端 A（服务端）：
+
+    ./run-dbus-server.sh
+    # 最后会打印一行 export DBUS_SESSION_BUS_ADDRESS=... —— 抄下来
+
+终端 B（Web，用 A 打印的地址）：
+
+    source .venv/bin/activate
+    export DBUS_SESSION_BUS_ADDRESS='unix:path=/run/user/1000/bus'  # ← A 给的
+    cd web && python -m uvicorn app:app --host 0.0.0.0 --port 8000
+
+关于那个 export：不设的话，libdbus 默认去找 /run/user/<你的uid>/bus。
+有 systemd 用户会话的发行版这文件本来就在，不用设；WSL 默认没有
+systemd，总线是脚本新建的、地址随机，所以才必须设。用 start.py 启动
+时它帮你注入了，这条 export 永远不用出现。
+
+---- 4.3 Windows 本机（没有 WSL）----------------------------------------
+
+    pip install psutil
+    python start.py --lite
+
+数据来自 psutil + 系统 ping +（有 PowerShell 时）宿主 WiFi 查询。
+Windows/macOS 上即使不写 --lite，工具层检测到没有 dbus 也会自动切
+轻量模式。
+
+---- 4.4 Docker ----------------------------------------------------------
+
+    cd deploy
+    QWEN_API_KEY=sk-你的key docker compose up --build
+    # 打开 http://127.0.0.1:8000
+
+---- 4.5 只要界面（演示模式）---------------------------------------------
+
+    python start.py --web-only
+    # 或已有服务在跑：直接打开 http://127.0.0.1:8000/?demo
+
+演示模式走假模型 + 假工具，不需要 key、不需要服务端，用来看界面和
+推理流程。命令行等价物：cd agent && python main.py --dry-run
+
+---- 4.6 停止 ------------------------------------------------------------
+
+    start.py 启动的：在启动终端按 Ctrl-C（服务端和 Web 一起停）
+    手动两终端起的：两个终端各按 Ctrl-C
+    Docker 起的：Ctrl-C 或 docker compose down
+
+
+================================================================================
+五、怎么确认跑起来了
+================================================================================
+
+浏览器打开 http://127.0.0.1:8000 ，输入"网络很卡，帮我看看"。
+健康检查（最权威的"到底哪儿没配对"）：
+
+    curl http://127.0.0.1:8000/api/health
+
+看这几项：
+    api_key           false = 没配 key（诊断会只剩数据没有结论）
+    rag_index         false = 没建索引（3.5 步）
+    dbus_python       false = 这个 Python 没有 dbus 库
+    netpulse_service  false = 连不上 C++ 服务（看 netpulse_error 原文）
+    interfaces        正常时应包含 wlan0（WSL 下由桥接注入的宿主 WiFi）
+    data_source       lite_psutil = 轻量模式在供数（没有 eBPF 速率）
+
+命令行单次提问（不起 Web）：
+
+    cd agent && python main.py -q "网络很卡，帮我看看"
+
+
+================================================================================
+六、报错速查
+================================================================================
+
+这个项目横跨 Windows / WSL / venv / Docker 四种环境，报错信息描述的
+常常是症状、根因在别处。先确认"我在哪"：
+
+    pwd                      # 当前目录
+    echo $VIRTUAL_ENV        # 激活了哪个 venv
+    uname -a                 # 带 Linux 字样 = 在 WSL 里
+
+--------------------------------------------------------------------------------
+A. 启动 / 服务端
+--------------------------------------------------------------------------------
+
+A1. 启动 Web 报 "address already in use"
+    8000 被占了。看是谁：ss -lntp | grep 8000（WSL）或
+    netstat -ano | findstr 8000（Windows）。换端口：--port 8080
+
+A2. 服务端起来又秒退 / 客户端全超时
+    九成是总线问题：服务端和客户端不在同一条总线上。用 start.py 启动
+    可避免；手动起的确认 export 的地址和 run-dbus-server.sh 打印的一致
+    （两边各 echo $DBUS_SESSION_BUS_ADDRESS 对一下）。
+    自测：dbus-send --print-reply --dest=org.freedesktop.DBus \
+      /org/freedesktop/DBus org.freedesktop.DBus.ListNames | grep WeakNet
+
+A3. setcap 报 "Operation not supported" / "No such file"
+    项目在 /mnt/e（Windows 挂载盘）上，xattr 不支持。run-dbus-server.sh
+    和 start.py 都会自动把服务端拷到 ~/.netpulse-server 再设能力，无需
+    手动处理。想彻底避免就把项目放到 WSL 的 ext4（见 3.1）。
+
+A4. 用 sudo 跑启动脚本被拒绝/行为怪异
+    root 连不上普通用户的 session bus（D-Bus 安全策略故意如此，报错还
+    很有误导性："Did not receive a reply"，听着像超时）。脚本检测到
+    root 会自动切回普通用户；看到提示就退出 sudo 重跑。
+
+A5. 总线上已有旧实例（NameHasOwner 为 true）
+    旧服务端还占着 com.example.WeakNet。回旧终端 Ctrl-C，再重启。
+
+A6. WSL 里监控只有 eth0，看不到 WiFi（WSL 用户的高频问题）
+    原因：WSL2 是独立的 Linux 虚拟机，有自己的网络命名空间，只有
+    eth0（虚拟网卡）和 lo。你上网用的 Windows WiFi 在宿主机上，
+    Linux 侧天然看不见 —— 这不是 bug，是 WSL2 的隔离设计。
+    解法：项目内置两层桥接（README「WSL2 用户」节有完整说明）——
+    Agent 侧 Python 桥接不重编就生效（HealthCheck 结果里多 wifi 字段）；
+    让 wlan0 成为监控主体需要重编服务端（make）。宿主机 WiFi 断开时
+    wlan0 会显示 disconnected，那是真实状态。
+
+--------------------------------------------------------------------------------
+B. Python / Web 服务
+--------------------------------------------------------------------------------
+
+B1. 页面提示"你在 Windows 上跑这个服务，而 D-Bus 是 Linux 专有的"
+    你在 PowerShell 里跑的服务，不是 WSL。D-Bus 是 Linux 的 IPC 机制，
+    dbus-python 在 Windows 上根本装不了（不是操作问题）。
+    解法：在 WSL 里跑（功能最全）/ python start.py --lite（本机轻量）/
+    点页面上的"演示模式"（不需要 D-Bus）。
+
+B2. 提示"没装 dbus-python"但你明明装了
+    装给了**另一个 Python**：sudo apt install python3-dbus 装的是系统
+    Python（/usr/bin/python3）的包，venv 默认看不到。建 venv 时加
+    --system-site-packages（见 3.4），或验证：
+        which python                          # 是不是 venv 里的
+        python -c "import dbus; print('OK')"
+    健康检查会报出正在跑服务的 Python 路径，和系统 Python 对比即可。
+
+B3. 提示"没读到 QWEN_API_KEY" / 模型调不动
+    先理解：os.environ.get("QWEN_API_KEY") 是【去读】，不是【配好了】。
+    三个最常见原因：在 A 终端 export 在 B 终端起服务 / 在 PowerShell
+    export 而服务跑在 WSL / export 后没重启。解法见 3.6。
+    验证：cd rag && python config.py，或看健康检查里 key 的后 4 位。
+
+B4. 提示"检索索引不存在" / search_network_history 失败
+        cd rag && python build_index.py --sample
+
+B5. 中文显示成问号或乱码
+        export PYTHONIOENCODING=utf-8
+
+B6. 改了代码但页面没变化
+    uvicorn 要加 --reload 才会自动重载；或手动 Ctrl+C 重启。
+
+B7. 手机/局域网访问不了
+    命令都带 --host 0.0.0.0（监听所有网卡）。还不行就是 Windows
+    防火墙：放行 python 的专用网络访问。
+
+--------------------------------------------------------------------------------
+C. 编译 / 构建
+--------------------------------------------------------------------------------
+
+C1. make 报找不到 dbus.h / glog/logging.h
+        sudo apt-get install -y libdbus-1-dev libglog-dev pkg-config
+
+C2. eBPF 编译报找不到 vmlinux.h 或 bpf helpers
+        sudo apt-get install -y libbpf-dev linux-headers-$(uname -r)
+    还不行就看看 server/src/vmlinux.h 在不在（3.5MB 那个文件）。
+
+C3. 编译过了但流量数据是空的
+    WSL2 内核对 eBPF 支持有限（kprobe 需要 tracefs，某些版本挂不上）。
+    不影响其它功能 —— 接口列表 / RTT / 丢包照常，只有流量和连接明细
+    需要 eBPF。真跑不了就换真 Linux 或云主机。
+
+C4. --lite 模式报缺 psutil
+        pip install psutil
+
+
+================================================================================
+七、venv 三句话 + 常用命令
+================================================================================
+
+    · venv 是什么：项目专属的 Python 环境，依赖装里面，不污染系统
+    · venv 在哪：项目根目录的 .venv/（3.4 的命令建）
+    · venv 怎么用：每个新终端先 source .venv/bin/activate；
+                   不想每次敲：echo 'source ~/netpulse/.venv/bin/activate' >> ~/.bashrc
+      注意：Windows 上建的 .venv 在 WSL 里不能用，两边各建各的
+
+常用命令：
+
+    # ---- 环境 ----
+    wsl                                      进 WSL
+    source .venv/bin/activate                激活 venv（每个新终端都要）
+    deactivate                               退出 venv
+    echo $VIRTUAL_ENV                        当前激活的是哪个 venv
+    cd rag && python config.py               看当前所有配置（含 key 读到没）
+
+    # ---- 启动 ----
+    python start.py                          完整模式一把梭
+    python start.py --lite                   轻量模式（无 Linux 也能跑）
+    python start.py --web-only               只要 Web
+    ./run-dbus-server.sh                     只起服务端（手动两终端方案）
+    python -m uvicorn app:app --host 0.0.0.0 --port 8000    只起 Web
+
+    # ---- 自检 ----
+    curl http://127.0.0.1:8000/api/health    看各项依赖状态
+    cd agent && python main.py -q "网络很卡"  命令行单次提问
+    cd agent && python main.py --dry-run      离线演示（不需要任何依赖）
+
+
+================================================================================
+八、上传 GitHub 前（30 秒）
+================================================================================
+
+仓库根目录已有 .gitignore 和 .dockerignore，**确认它们存在且未被修改**
+再 git add。三条红线：
+
+    · .env                 真 API Key，绝不提交
+    · agent/memory_store/  你的真实诊断数据（memories.jsonl），是用户数据
+    · server/bin、server/build、__pycache__、logs/   二进制与运行时产物
+
+详细清单见 README「上线与分发」一节。
