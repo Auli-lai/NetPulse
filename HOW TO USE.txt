@@ -6,9 +6,9 @@ NetPulse 使用手册 —— 从零到跑起来
 
     你只有 Windows，不想装别的        python start.py --lite
     你愿意装个 Docker                 cd deploy && docker compose up --build
-    你有 WSL（要完整功能）             python start.py
+    你有 WSL（要完整功能）            python start.py
     你只想看看界面，什么都不装         python start.py --web-only
-                                        然后打开 http://127.0.0.1:8000/?demo
+                                    然后打开 http://127.0.0.1:8000/?demo
 
 四条路共用同一套 Agent / 工具 / 前端，差的只是数据从哪来。下文按
 "第一次配置 → 日常启动 → 排错"组织，第一次用请按顺序读。
