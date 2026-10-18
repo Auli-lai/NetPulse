@@ -1,0 +1,41 @@
+# NetPulse 全栈一条命令：
+#
+#     cd deploy
+#     QWEN_API_KEY=sk-你的key docker compose up --build
+#     打开 http://127.0.0.1:8000
+#
+# 没有 key 也能起：打开 http://127.0.0.1:8000/?demo 走假模型，不花钱。
+
+services:
+  netpulse:
+    build:
+      # ⚠️ 上下文是项目根目录（../），因为要 server/ agent/ rag/ web/ 全拷进去
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: netpulse:latest
+    container_name: netpulse
+    ports:
+      - "127.0.0.1:8000:8000"     # 只绑本机。要暴露给局域网/公网先看 README 安全说明
+    environment:
+      # 必填：百炼 API Key。不传也能起，诊断会降级成"只有数据没有结论"，
+      # 但 /?demo 演示模式照常可用。
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+      # 置 1 = 哈希伪向量，不调 embedding API（省钱、离线可用，检索质量不代表真实效果）
+      - RAG_OFFLINE=${RAG_OFFLINE:-}
+    restart: unless-stopped
+
+    # ------------------------------------------------------------------#
+    # 下面两行是"完整 eBPF 功能"的开关，默认故意注释掉。为什么：          #
+    #                                                                     #
+    # 1. bridge 网络（默认）下，服务端看到的是 docker0/veth，              #
+    #    **不是你机器上的真实网卡** —— 接口列表会是容器内部接口            #
+    # 2. privileged + host 网络在原生 Linux 上能看到真实网卡，             #
+    #    但 Docker Desktop（Windows/macOS）的 Linux VM 内核               #
+    #    仍然看不到你物理机的 WiFi                                        #
+    # 3. 不加也能跑：服务端优雅降级，接口/RTT/丢包可能不可用，              #
+    #    但 Web、Agent 循环、知识库检索、长期记忆、演示模式全不受影响      #
+    #                                                                     #
+    # 想监控你本机的真实网卡，最靠谱的仍是：在宿主机 python start.py      #
+    # ------------------------------------------------------------------#
+    # privileged: true
+    # network_mode: host
