@@ -1,0 +1,24 @@
+# RAG 检索层依赖
+#
+# 装之前先想清楚每个包为什么在，别一把梭 pip install -r 然后不知道谁是谁：
+#
+#   anthropic       生成层。走百炼的 Anthropic 兼容端点（/apps/anthropic）
+#   openai          向量化层。Anthropic 协议没有 embedding，只能走
+#                   百炼的 OpenAI 兼容端点（/compatible-mode/v1）
+#   faiss-cpu       稠密向量索引。CPU 版就够，GPU 版你这场景是杀鸡用牛刀
+#   jieba           中文分词。BM25 是词袋模型，中文不分词等于没分
+#   numpy           向量运算
+#   requests        rerank 调用。百炼 rerank 用的原生协议不带官方 SDK，
+#                   直接发 HTTP 最直白
+#
+# 注意：**不再需要 langchain**。
+# 原代码用 langchain 是为了 FAISS 封装和 text splitter，这两件事
+# 本目录用 faiss 原生的 IndexFlatIP 和结构感知切分自己做了 —— 少一层抽象，
+# 出问题时能直接看到底层在干什么，调试成本低很多。
+
+anthropic>=0.40.0
+openai>=1.40.0
+faiss-cpu>=1.7.4
+jieba>=0.42.1
+numpy>=1.24.0
+requests>=2.31.0

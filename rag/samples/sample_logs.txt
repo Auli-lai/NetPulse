@@ -1,0 +1,43 @@
+I20260924 10:00:28.100000 1234 net_monitor.cc:88] RTT_MONITOR: eth0 | RTT: 14ms | Quality: 1 | Using: YES | Target: 223.5.5.5
+I20260924 10:00:28.200000 1234 net_monitor.cc:88] TRAFFIC_MONITOR: Total=2.4MB/s, Flows=14, PPS=1150, Interface=eth0
+I20260924 10:00:29.100000 1234 net_monitor.cc:88] TCP_LOSS_MONITOR: interface=eth0 rate=0.0% delta_sent=318 delta_retrans=0 level=good
+I20260924 10:00:30.000000 1234 net_monitor.cc:88] 网络质量变化: EXCELLENT (分数: 92.0, 接口: eth0)
+I20260924 10:00:58.100000 1234 net_monitor.cc:88] RTT_MONITOR: eth0 | RTT: 15ms | Quality: 1 | Using: YES | Target: 223.5.5.5
+I20260924 10:00:58.200000 1234 net_monitor.cc:88] TRAFFIC_MONITOR: Total=2.5MB/s, Flows=15, PPS=1200, Interface=eth0
+I20260924 10:00:59.100000 1234 net_monitor.cc:88] TCP_LOSS_MONITOR: interface=eth0 rate=0.0% delta_sent=325 delta_retrans=0 level=good
+I20260924 10:01:28.100000 1234 net_monitor.cc:88] RTT_MONITOR: eth0 | RTT: 88ms | Quality: 2 | Using: YES | Target: 223.5.5.5
+I20260924 10:01:28.200000 1234 net_monitor.cc:88] TRAFFIC_MONITOR: Total=2.6MB/s, Flows=18, PPS=1310, Interface=eth0
+I20260924 10:01:29.100000 1234 net_monitor.cc:88] TCP_LOSS_MONITOR: interface=eth0 rate=0.4% delta_sent=330 delta_retrans=2 level=good
+I20260924 10:01:30.000000 1234 net_monitor.cc:88] 网络质量变化: FAIR (分数: 64.0, 接口: eth0)
+I20260924 10:01:58.100000 1234 net_monitor.cc:88] RTT_MONITOR: eth0 | RTT: 210ms | Quality: 4 | Using: YES | Target: 223.5.5.5
+I20260924 10:01:58.200000 1234 net_monitor.cc:88] TRAFFIC_MONITOR: Total=2.7MB/s, Flows=23, PPS=1480, Interface=eth0
+I20260924 10:01:59.100000 1234 net_monitor.cc:88] TCP_LOSS_MONITOR: interface=eth0 rate=3.2% delta_sent=337 delta_retrans=12 level=poor
+I20260924 10:02:00.000000 1234 net_monitor.cc:88] 网络质量变化: POOR (分数: 42.0, 接口: eth0)
+I20260924 10:02:28.100000 1234 net_monitor.cc:88] RTT_MONITOR: eth0 | RTT: 195ms | Quality: 4 | Using: YES | Target: 223.5.5.5
+I20260924 10:02:28.200000 1234 net_monitor.cc:88] TRAFFIC_MONITOR: Total=2.5MB/s, Flows=21, PPS=1400, Interface=eth0
+I20260924 10:02:29.100000 1234 net_monitor.cc:88] TCP_LOSS_MONITOR: interface=eth0 rate=2.8% delta_sent=322 delta_retrans=9 level=poor
+I20260924 10:02:30.000000 1234 net_monitor.cc:88] 网络质量稳定: POOR ( 分数: 41.0)
+I20260924 10:03:28.100000 1234 net_monitor.cc:88] RTT_MONITOR: eth0 | RTT: 16ms | Quality: 1 | Using: YES | Target: 223.5.5.5
+I20260924 10:03:28.200000 1234 net_monitor.cc:88] TRAFFIC_MONITOR: Total=2.3MB/s, Flows=13, PPS=1100, Interface=eth0
+I20260924 10:03:29.100000 1234 net_monitor.cc:88] TCP_LOSS_MONITOR: interface=eth0 rate=0.0% delta_sent=310 delta_retrans=0 level=good
+I20260924 10:03:30.000000 1234 net_monitor.cc:88] 网络质量变化: EXCELLENT (分数: 90.0, 接口: eth0)
+I20260924 10:10:00.100000 1234 net_monitor.cc:88] RSSI监控: wlan0 = -62dBm (质量:1, 使用:NO)
+I20260924 10:10:00.200000 1234 net_monitor.cc:88] RTT_MONITOR: wlan0 | RTT: 22ms | Quality: 1 | Using: NO | Target: 114.114.114.114
+I20260924 10:10:30.100000 1234 net_monitor.cc:88] RSSI监控: wlan0 = -74dBm (质量:2, 使用:NO)
+I20260924 10:10:30.200000 1234 net_monitor.cc:88] RTT_MONITOR: wlan0 | RTT: 48ms | Quality: 2 | Using: NO | Target: 114.114.114.114
+I20260924 10:11:00.100000 1234 net_monitor.cc:88] RSSI监控: wlan0 = -88dBm (质量:3, 使用:NO)
+I20260924 10:11:00.200000 1234 net_monitor.cc:88] RTT_MONITOR: wlan0 | RTT: 133ms | Quality: 3 | Using: NO | Target: 114.114.114.114
+I20260924 10:11:30.100000 1234 net_monitor.cc:88] RSSI监控: wlan0 = -91dBm (质量:4, 使用:NO)
+I20260924 10:11:30.200000 1234 net_monitor.cc:88] RTT_MONITOR: wlan0 | RTT: 180ms | Quality: 4 | Using: NO | Target: 114.114.114.114
+I20260924 10:12:00.000000 1234 net_monitor.cc:88] 网络质量变化: POOR (分数: 38.0, 接口: wlan0)
+I20260924 10:20:00.100000 1234 net_monitor.cc:88] ACTIVE: eth0 | RTT: 16ms | Quality: 1 | RSSI: -1000dBm | TCP Loss: 0.0% (good) | Traffic: 2.4MB/s, 15 flows, 1180 pps
+I20260924 10:20:30.100000 1234 net_monitor.cc:88] ACTIVE: eth0 | RTT: 17ms | Quality: 1 | RSSI: -1000dBm | TCP Loss: 0.0% (good) | Traffic: 2.5MB/s, 16 flows, 1200 pps
+I20260924 10:21:00.100000 1234 net_monitor.cc:88] ACTIVE: eth0 | RTT: -1ms | Quality: 0 | RSSI: -1000dBm | TCP Loss: -1% () | Traffic: 0.0MB/s, 0 flows, 0 pps
+I20260924 10:21:30.100000 1234 net_monitor.cc:88] ACTIVE: eth0 | RTT: -1ms | Quality: 0 | RSSI: -1000dBm | TCP Loss: -1% () | Traffic: 0.0MB/s, 0 flows, 0 pps
+I20260924 10:30:00.100000 1234 net_monitor.cc:88] TRAFFIC_MONITOR: Total=95.0MB/s, Flows=4820, PPS=92000, Interface=eth0
+I20260924 10:30:29.100000 1234 net_monitor.cc:88] TCP_LOSS_MONITOR: interface=eth0 rate=6.8% delta_sent=1204 delta_retrans=82 level=critical
+I20260924 10:30:29.200000 1234 net_monitor.cc:88] RTT_MONITOR: eth0 | RTT: 340ms | Quality: 4 | Using: YES | Target: 223.5.5.5
+I20260924 10:30:30.000000 1234 net_monitor.cc:88] 网络质量变化: POOR (分数: 21.0, 接口: eth0)
+I20260924 10:31:00.100000 1234 net_monitor.cc:88] TRAFFIC_MONITOR: Total=96.2MB/s, Flows=5012, PPS=95100, Interface: eth0
+I20260924 10:31:29.100000 1234 net_monitor.cc:88] TCP_LOSS_MONITOR: interface=eth0 rate=7.4% delta_sent=1310 delta_retrans=97 level=critical
+I20260924 10:31:30.000000 1234 net_monitor.cc:88] 网络质量稳定: POOR ( 分数: 19.0)

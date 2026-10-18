@@ -1,0 +1,80 @@
+# NetPulse Web 服务
+#
+#     cd web
+#     docker compose up --build
+#     打开 http://127.0.0.1:8000
+#
+# 只想看界面、不想配任何东西：
+#     打开 http://127.0.0.1:8000/?demo      （走假模型，不花钱）
+#
+# 命令行调试（效果和 --dry-run 一样）：
+#     curl -X POST http://127.0.0.1:8000/api/diagnose \
+#          -H 'Content-Type: application/json' \
+#          -d '{"question":"网络很卡","demo":true}'
+
+services:
+  web:
+    build:
+      # ⚠️ 上下文必须是项目根目录 —— 要拷 agent/ 和 rag/
+      context: ..
+      dockerfile: web/Dockerfile
+    image: netpulse-web:latest
+    container_name: netpulse-web
+    ports:
+      - "127.0.0.1:8000:8000"     # 只绑本机。要对外暴露先看 README 的安全说明
+    environment:
+      # API Key。不传也能起，只是诊断会降级成"只有数据没有结论"
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+      # 置 1 用哈希伪向量，不调 embedding API（省钱、离线可用，但检索质量不代表真实效果）
+      - RAG_OFFLINE=${RAG_OFFLINE:-}
+      # 记忆存到 volume 里，容器重建不丢
+      - NETPULSE_MEMORY_DIR=/data/memory
+      # 日志目录（只读挂载，见下面 volumes）
+      - NETPULSE_LOG_DIR=/logs
+    volumes:
+      # 索引持久化：在容器里建好一次，之后重建容器不用重跑
+      - rag_index:/app/rag/index_store
+      - memory:/data/memory
+      # 宿主机的日志目录，只读挂进去（给 netpulse://logs 资源用）
+      # - ../logs:/logs:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  rag_index:
+  memory:
+
+# ============================================================================
+# 关于 D-Bus：为什么默认不挂
+# ============================================================================
+#
+# 实时指标类工具（get_conn_stats / get_flows / ping_host）需要访问宿主机的
+# **session bus**，而容器默认有自己的网络和 IPC 命名空间，看不到它。
+#
+# 而且这事比看起来麻烦：D-Bus session bus 的 socket 在
+# `/run/user/<uid>/bus`，它是**属于某个登录用户的**，容器里的 uid 往往对不上，
+# 挂进去也常常连不上；再加上宿主机的服务端还得以 root 跑（eBPF 需要），
+# 两边的权限模型很难对齐。
+#
+# 所以本项目**默认不挂**，让这些工具走降级路径 —— 它们会返回错误，
+# 模型看得到并会绕开，知识库检索和长期记忆完全不受影响。
+# 一条完整的诊断因此变成"只看历史和知识"的诊断，仍然有价值。
+#
+# 如果你确实要在容器里用实时工具，Linux 上可以试：
+#
+#     volumes:
+#       - /run/user/1000/bus:/run/dbus/bus
+#     environment:
+#       - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/bus
+#     user: "1000:1000"        # 必须用 socket 属主的 uid，否则权限不够
+#
+# 把 1000 换成 `id -u` 的结果。
+#
+# **但更简单的做法是：Web 服务直接跑在宿主机上**（uvicorn app:app），
+# 不折腾容器网络。Docker 打包的意义是"能一键部署到别的机器"，
+# 而在**本机开发演示**时，裸跑反而更省事。

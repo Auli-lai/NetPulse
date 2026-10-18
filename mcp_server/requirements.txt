@@ -1,0 +1,25 @@
+# MCP Server 层的依赖
+#
+# 安装：
+#     pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+
+# MCP 官方 Python SDK。
+#
+# ⚠️ 注意版本：mcp 2.x 是一次大改。
+#    v1 的写法是 from mcp.server.fastmcp import FastMCP
+#    v2 改成了  from mcp.server.mcpserver import MCPServer
+#
+# 网上（包括很多教程和 AI 生成的代码）大量 v1 的例子，直接抄会 ImportError。
+# 本项目按 2.x 写的。如果你要装 v1，用 mcp<2，但那样本目录的代码跑不了。
+mcp>=2.2
+
+# 桥接层要 import 隔壁 agent/tools.py，间接依赖：
+#   anthropic（生成，Agent 用；MCP Server 本身不需要）
+#   faiss-cpu / jieba / numpy / openai / requests（search_network_history 工具要用）
+#
+# 完整装法见 agent/requirements.txt 和 rag/requirements.txt。
+
+# dbus-python 仍然是 Linux 专有的，pip 装不上：
+#     sudo apt install python3-dbus
+# 没装它的话：实时指标类的工具和资源不可用，
+# 但 --demo 模式、知识库资源、测试全都照常能跑。
