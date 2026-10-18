@@ -6,7 +6,7 @@
 
 ![界面截图](docs/screenshot-light.png)
 
-> 📖 **第一次跑这个项目，先看 [`How To Use.txt`](How To Use.txt)** ——
+> 📖 **第一次跑这个项目，先看 [`HOW TO USE.txt`]** ——
 > 完整的启动流程、虚拟环境用法、以及所有踩过的坑和报错速查。
 > 本 README 讲的是"这个项目是什么、难点在哪"，那份文档讲的是"怎么让它跑起来"。
 
@@ -61,67 +61,6 @@ python main.py --dry-run
 
 用假模型 + 假工具把完整推理链演一遍 —— **不用 API Key、不用起 C++ 服务、不用建索引**。
 
-想要可视化界面：
-
-```bash
-cd web
-pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-uvicorn app:app --port 8000
-```
-
-打开 <http://127.0.0.1:8000>，点**演示模式**，再点一个示例问题。
-
-深色模式：
-
-![深色模式](docs/screenshot-dark.png)
-
-界面上能实时看到每一轮思考、每次工具调用的参数和原始返回（可展开）、最终结论。
-顶部的 **「被拦截的重复调用」** 不是 0 的时候，说明容错机制正在工作。
-
----
-
-## 三、完整部署
-
-### 环境要求
-
-| 操作系统 | **Linux**（WSL2 可用）。eBPF 和 D-Bus 都只有 Linux 有 |
-| Python | 3.10+ |
-| 权限 | root（eBPF 和原始套接字需要） |
-| 百炼 API Key | 可选。没有也能跑采集和检索，只是没有自然语言结论 |
-
-> Windows 用户请用 WSL2，并把项目放在 WSL 的文件系统里（如 `~/netpulse`）
-> 而不是 `/mnt/e/...` —— 跨文件系统 IO 慢很多，D-Bus 在跨系统场景下也偶发连不上。
-
-### 步骤
-
-```bash
-# 1. 编译 C++ 服务
-sudo apt-get install -y build-essential clang llvm pkg-config \
-  libdbus-1-dev libglog-dev libelf-dev zlib1g-dev libcap-dev \
-  linux-headers-$(uname -r) libbpf-dev
-make
-
-# 2. 启动服务（-E 不能省，见下方"排查"第一条）
-sudo -E ./server/bin/weaknet-dbus-server
-
-# 3. 装 Python 依赖
-pip install -r rag/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-pip install -r agent/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-pip install -r web/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-sudo apt install python3-dbus
-
-# 4. 建检索索引
-cd rag && python build_index.py --sample
-
-# 5. 配 Key（可选）
-export QWEN_API_KEY='sk-你的百炼key'
-
-# 6. 跑
-cd ../agent && python main.py -q "网络很卡，帮我看看"
-```
-
-四条外部依赖**缺任何一条都不会让程序崩** —— 对应的工具返回错误，模型看得到并会绕开。
-这是有意的降级设计。启动时会自动检查并提示。
 
 ### 怎么用 Agent
 
@@ -138,9 +77,6 @@ python main.py --memories               # 它记住了什么
 python main.py --forget mem_abc123      # 删掉某条记忆
 python main.py --no-memory -q "..."     # 本次不读写记忆
 ```
-
-交互模式下多轮共享上下文，所以第二句问"那 wlan0 呢"它能听懂 ——
-这是单次提问（`-q`）和交互模式的区别。
 
 其他入口见各目录的 README：`rag/` `agent/` `mcp_server/` `web/`。
 
@@ -381,7 +317,8 @@ AI-Network-Monitoring-System/
 │   ├── app.py / runstore.py     # FastAPI + 线程→异步的事件桥
 │   └── static/index.html        # 单页前端，零外部依赖
 ├── docs/                        # README 用的截图
-├── AI-assisted analysis_old/    # 知识库数据源（勿删，见 rag/knowledge.py）
+├── deploy/                      
+
 ```
 ## License
 
