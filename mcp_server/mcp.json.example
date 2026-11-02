@@ -1,0 +1,35 @@
+{
+  "_README": [
+    "把这个文件的 mcpServers 块复制到 Claude Code 的 .mcp.json（项目根目录）",
+    "或 Claude Desktop 的 claude_desktop_config.json，然后重启客户端。",
+    "",
+    "把 <项目绝对路径> 换成你的实际路径，注意 Windows 上用正斜杠或双反斜杠。",
+    "当前路径是：E:/Vscode projects/AI-Network-Monitoring-System",
+    "",
+    "第一次接建议先用 --demo 跑通（不依赖 C++ 服务），",
+    "确认客户端能连上、能看到 6 个工具之后，再把 --demo 去掉换成真实数据。"
+  ],
+  "mcpServers": {
+    "netpulse": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "<项目绝对路径>/mcp_server/server.py"
+      ],
+      "cwd": "<项目绝对路径>/mcp_server",
+      "env": {
+        "NETPULSE_LOG_DIR": "<项目绝对路径>/logs",
+        "RAG_INDEX_DIR": "<项目绝对路径>/rag/index_store"
+      }
+    },
+    "netpulse-demo": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "<项目绝对路径>/mcp_server/server.py",
+        "--demo"
+      ],
+      "cwd": "<项目绝对路径>/mcp_server"
+    }
+  }
+}

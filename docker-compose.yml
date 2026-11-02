@@ -1,0 +1,43 @@
+# NetPulse 全栈一键编排
+#
+#   docker compose up --build
+#   打开 http://127.0.0.1:8000
+#
+# 说明：
+#   · privileged 是 eBPF 必须的；这是本地诊断镜像，端口只绑 127.0.0.1。
+#   · 容器内已编译好 C++ 引擎并起好 D-Bus + Web，宿主端无需装 clang/cmake/C++/Python。
+#   · 容器内看不到宿主真实上网网卡（网络命名空间隔离），真实 WiFi / 以太网数据
+#     由宿主侧的 host_bridge_daemon.py 经 host.docker.internal 喂进来
+#     （start.sh --docker-full 会自动在宿主后台起这个守护进程）。
+#   · 想接真实 LLM 结论：export QWEN_API_KEY=sk-xxx 后再 up；不填也能跑（演示 / 降级）。
+
+services:
+  netpulse:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: netpulse-full:latest
+    container_name: netpulse-full
+    privileged: true
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+      # 告诉容器内代码"你在容器里"，走宿主桥接而非直接调 powershell.exe
+      - NETPULSE_IN_CONTAINER=1
+      # 宿主桥接守护进程地址（Docker Desktop 自带 host.docker.internal 解析；
+      # 原生 Linux Docker 靠下面 extra_hosts 的 host-gateway 兜底）
+      - NETPULSE_BRIDGE_URL=http://host.docker.internal:18900/host-net
+      # WSL2 实例 IP：start.sh --docker-full 会在 WSL2 下自动填，作为更稳的直连地址
+      - NETPULSE_BRIDGE_HOST=${NETPULSE_BRIDGE_HOST:-}
+      # 诊断运行历史存到 volume 里，容器重建不丢（左侧历史侧栏持久化）
+      - NETPULSE_RUNS_DIR=/data/runs
+    # 让 host.docker.internal 在原生 Linux Docker 上也能解析到宿主
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - netpulse_runs:/data/runs
+    restart: unless-stopped
+
+volumes:
+  netpulse_runs:

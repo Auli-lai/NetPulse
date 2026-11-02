@@ -1,0 +1,18 @@
+# 构建上下文排除项：避免把宿主的虚拟环境 / 编译产物 / 大目录打进镜像
+.venv/
+**/__pycache__/
+**/*.pyc
+**/*.o
+**/*.so
+**/*.bin
+server/build/
+server/bin/
+client/bin/
+client/lib/
+logs/
+.git/
+AI-assisted analysis_old/
+node_modules/
+*.md
+docs/
+.dbus-address

@@ -1,0 +1,103 @@
+# =============================================================================
+# NetPulse CI —— 推送即构建 + 离线测试 + 打镜像
+# =============================================================================
+#
+# 设计定调（与 start.sh 的启动方式解耦）：
+#   · 验证（CI 在这里做）= 干净 Ubuntu runner 上编译 C++/eBPF + 跑离线测试 + 构建 Docker 镜像
+#   · 交付（CD 才做）   = 用 docker-compose.yml 的 netpulse-full 全栈镜像（--docker-full 形态）上线
+#   · 明确排除         = 真实 eBPF 端到端（--full / --docker-full 需要特权容器 + 真实内核，
+#                        GitHub 标准 runner 跑不了，强行跑必败，所以不进 CI）
+#
+# 测试策略（零 API Key、不碰 D-Bus）：
+#   · agent/test_agent.py —— 用 ScriptedChatModel 假模型驱动 ReAct 循环，覆盖工具失败回灌、
+#                            重复拦截、轮次上限、上下文裁剪配对、取消等边界（确定性断言）
+#   · web/test_api.py    —— 用 FastAPI TestClient 离线测 SSE 断点续传、跨线程事件桥接、取消事件流
+#   这两个文件都是自带 main() + 退出码的离线脚本（不是 pytest 框架文件），CI 直接以脚本方式
+#   执行，靠退出码判定红/绿，比强行套 pytest 更诚实（它们的 check() 不抛异常，套 pytest 会假绿）。
+# =============================================================================
+
+name: CI
+
+on:
+  push: {}                    # 任意分支 push 都触发（含 PR 的 head 分支）
+  workflow_dispatch: {}       # 允许在 Actions 页面手动触发
+
+# 并发控制：同一分支只保留最新一次，取消旧的运行，省额度
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python 3.12（与 docker/Dockerfile 的 python:3.12 对齐）
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            agent/requirements.txt
+            web/requirements.txt
+
+      # ---------------------------------------------------------------------
+      # 系统编译依赖：与 docker/Dockerfile 的 apt 列表对齐，但【不装 python3*-dev】。
+      # 原因：宿主机 make 只编 C++ 引擎 + eBPF 对象，不编 Python 扩展；
+      #       只有镜像内编 dbus-python 才靠官方 python:3.12 镜像自带的头文件。
+      # ---------------------------------------------------------------------
+      - name: 安装系统编译依赖（clang / libbpf / glog / dbus 等）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang pkg-config \
+            libdbus-1-dev libgoogle-glog-dev libbpf-dev libelf-dev \
+            zlib1g-dev libcap-dev libglib2.0-dev libgomp1 curl dbus
+
+      # ---------------------------------------------------------------------
+      # 编译：根 Makefile 的 all 会递归进 server/ 编出
+      #   · flow_rate.bpf.o（eBPF 对象，clang -target bpf）
+      #   · weaknet-dbus-server（C++ 采集引擎）
+      #   · libweaknet.so + test-client（客户端动态库与测试程序）
+      # 纯编译，不需要 root / 不需要运行中的 D-Bus。
+      # ---------------------------------------------------------------------
+      - name: 编译 C++ 引擎与 eBPF 对象（make）
+        run: make
+
+      # ---------------------------------------------------------------------
+      # Python 依赖：建 venv 后装 agent + web 两份 requirements。
+      # 注意：agent/requirements.txt 里的 dbus-python 是注释说明项（需 apt 装 python3-dbus），
+      #       这里不装它——离线测试用 FakeRunner / ScriptedChatModel，不碰 D-Bus。
+      #       numpy / openai / faiss-cpu / jieba 等是 embedder 的硬依赖，必须装（否则 import 即挂）。
+      # GitHub runner 直连 PyPI 很快，无需切国内镜像。
+      # ---------------------------------------------------------------------
+      - name: 准备 Python 依赖（venv，零 API Key）
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install -U pip
+          pip install -r agent/requirements.txt -r web/requirements.txt
+
+      # ---------------------------------------------------------------------
+      # 离线测试：假模型、零 Key、不碰 D-Bus。靠脚本退出码判定（非 0 即红）。
+      # PYTHONPATH 把仓库根、agent/、web/、rag/ 都挂上，保证 namespace 包与
+      # `from agent import ...` / `from runstore import ...` 都能解析。
+      # ---------------------------------------------------------------------
+      - name: 运行离线测试（假模型 ScriptedChatModel / 零 Key）
+        run: |
+          . .venv/bin/activate
+          export PYTHONPATH=".:agent:web:rag"
+          python agent/test_agent.py
+          RAG_OFFLINE=1 python web/test_api.py
+
+      # ---------------------------------------------------------------------
+      # 构建镜像：docker compose build 只构建 netpulse-full 镜像（验证 Dockerfile
+      # 能跑通：含 pip 装依赖、镜像内编 dbus-python）。
+      # 不执行 `up` —— 真实 eBPF 需要 privileged + 真实内核，标准 runner 不跑端到端。
+      # ---------------------------------------------------------------------
+      - name: 构建 Docker 镜像（docker compose build，仅构建不运行）
+        run: docker compose build
