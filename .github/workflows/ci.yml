@@ -87,10 +87,28 @@ jobs:
       # PYTHONPATH 把仓库根、agent/、web/、rag/ 都挂上，保证 namespace 包与
       # `from agent import ...` / `from runstore import ...` 都能解析。
       # ---------------------------------------------------------------------
+      # ---------------------------------------------------------------------
+      # 离线测试：假模型、零 Key、不碰 D-Bus。靠脚本退出码判定（非 0 即红）。
+      # PYTHONPATH 把仓库根、agent/、web/、rag/ 都挂上，保证 namespace 包与
+      # `from agent import ...` / `from runstore import ...` 都能解析。
+      #
+      # 关于 QWEN_API_KEY 与 RAG 索引（这是上次 CI 红的根因）：
+      #   web/test_api.py 的“服务正常时不报 hints”断言，要求健康检查**不输出任何 hint**。
+      #   而 app.py 的健康检查在最前面就根据两件事加 hint：
+      #     ① 没设 QWEN_API_KEY  → 报“缺 key”；设了但不以 sk- 开头 → 报“不像 key”
+      #     ② rag/index_store/dense.faiss 不存在 → 报“缺索引”
+      #   所以该测试只在“key 已配 + 索引已建”的开发环境才通过。CI 是裸环境，两者都没有，
+      #   必须在这里补齐：给一个 sk- 开头的假 key（web 测试全走 demo 假模型，不会真调 LLM），
+      #   并用 --offline 造一份占位索引（md5 假向量，不调 embedding API，索引目录已被 gitignore）。
+      # ---------------------------------------------------------------------
       - name: 运行离线测试（假模型 ScriptedChatModel / 零 Key）
+        env:
+          QWEN_API_KEY: sk-ci-dummy-not-a-real-key
         run: |
           . .venv/bin/activate
           export PYTHONPATH=".:agent:web:rag"
+          # 离线造 RAG 索引，否则 web 健康检查“不报 hints”断言会失败
+          (cd rag && python build_index.py --sample --offline)
           python agent/test_agent.py
           RAG_OFFLINE=1 python web/test_api.py
 
