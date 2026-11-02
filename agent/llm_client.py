@@ -534,6 +534,20 @@ class ScriptedChatModel:
         self._index = 0
         self.calls: list[list[dict[str, Any]]] = []
 
+    def reset(self) -> None:
+        """把剧本指针拨回开头，让同一份剧本能在多次诊断里重复重放。
+
+        评测（eval_agent.py）会对一批 query 复用同一个 ScriptedChatModel，
+        如果不 reset，第一条 query 把剧本消耗完，后面的 query 一上来就拿到
+        最后一个“无工具调用的结论 turn”，于是轮次=0、证据为空，
+        答案里的指标又对不上证据 —— 被幻觉检测误伤。
+
+        真实模型不需要、也没有 reset（它的状态在服务端），所以调用方用
+        `hasattr(model, "reset")` 判断即可，reset 只对假模型生效。
+        """
+        self._index = 0
+        self.calls = []
+
     def chat(
         self, messages: list[dict[str, Any]], tools: Sequence[dict[str, Any]]
     ) -> Turn:
